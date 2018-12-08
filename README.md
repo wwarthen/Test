@@ -1,2 +1,1760 @@
-# Test
-Test
+# Overview
+
+RomWBW provides a complete firmware package for all of the Z80 and Z180
+based systems that are available in the RetroBrew Computers Community
+(see
+[http://www.retrobrewcomputers.org](http://www.retrobrewcomputers.org/))
+as well as support for the RC2014 platform. Each of these systems
+provides for a fairly large ROM memory (typically, 512KB or more).
+RomWBW allows you to configure and build appropriate contents for such a
+ROM.
+
+Typically, a computer will contain a small ROM that contains the BIOS
+(Basic Input/Output System) functions as well as code to start the
+system by booting an operating system from a disk. Since the RetroBrew
+Computers Projects provide a large ROM space, RomWBW provides a much
+more comprehensive software package. In fact, it is entirely possible to
+run a fully functioning RetroBrew Computers System with nothing but the
+ROM.
+
+RomWBW firmware includes:
+
+  - System startup code (bootstrap)
+
+  - A basic system/debug monitor
+
+  - HBIOS (Hardware BIOS) providing support for the vast majority of
+    RetroBrew Computers I/O components
+
+  - A complete operating system (either CP/M 2.2 or ZSDOS 1.1)
+
+  - A built-in CP/M filesystem containing the basic applications and
+    utilities for the operating system and hardware being used
+
+It is appropriate to note that much of the code and components that make
+up a complete RomWBW package are derived from pre-existing work. Most
+notably, the imbedded operating system is simply a ROM-based copy of
+generic CP/M or ZSDOS. Much of the hardware support code was originally
+produced by other members of the RetroBrew Computers Community.
+
+The remainder of this document will focus on the HBIOS portion of the
+ROM. HBIOS contains the vast majority of the custom-developed code for
+the RetroBrew Computers hardware platforms. It provides a formal,
+structured interface that allows the operating system to be hosted with
+relative ease.
+
+# Background
+
+The Z80 CPU architecture has a limited, 64K address range. In general,
+this address space must accommodate a running application, disk
+operating system, and hardware support code.
+
+All RetroBrew Computers Z80 CPU platforms provide a physical address
+space that is much larger than the CPU address space (typically 512K or
+1MB physical RAM). This additional memory can be made available to the
+CPU using a technique called bank switching. To achieve this, the
+physical memory is divided up into chunks (banks) of 32K each. A
+designated area of the CPU’s 64K address space is then reserved to “map”
+any of the physical memory chunks. You can think of this as a window
+that can be adjusted to view portions of the physical memory in 32K
+blocks. In the case of RetroBrew Computers platforms, the lower 32K of
+the CPU address space is used for this purpose (the window). The upper
+32K of CPU address space is assigned a fixed 32K area of physical memory
+that never changes. The lower 32K can be “mapped” on the fly to any of
+the 32K banks of physical memory at a time. The only constraint is that
+the CPU cannot be executing code in the lower 32K of CPU address space
+at the time that a bank switch is performed.
+
+By cleverly utilizing the pages of physical RAM for specific purposes
+and swapping in the correct page when needed, it is possible to utilize
+substantially more than 64K of RAM. Because the RetroBrew Computers
+Project has now produced a very large variety of hardware, it has become
+extremely important to implement a bank switched solution to accommodate
+the maximum range of hardware devices and desired functionality.
+
+# General Design Strategy
+
+The design goal is to locate as much of the hardware dependent code as
+possible out of normal 64KB CP/M address space and into a bank switched
+area of memory. A very small code shim (proxy) is located in the top 512
+bytes of CPU memory. This proxy is responsible for redirecting all
+hardware BIOS (HBIOS) calls by swapping the “driver code” bank of
+physical RAM into the lower 32K and completing the request. The
+operating system is unaware this has occurred. As control is returned to
+the operating system, the lower 32KB of memory is switched back to the
+original memory bank.
+
+HBIOS is completely agnostic with respect to the operating system (it
+does not know or care what operating system is using it). The operating
+system makes simple calls to HBIOS to access any desired hardware
+functions. Since the HBIOS proxy occupies only 512 bytes at the top of
+memory, the vast majority of the CPU memory is available to the
+operating system and the running application. As far as the operating
+system is concerned, all of the hardware driver code has been magically
+implemented inside of a small 512 byte area at the top of the CPU
+address space.
+
+Unlike some other Z80 bank switching schemes, there is no attempt to
+build bank switching into the operating system itself. This is
+intentional so as to ensure that any operating system can easily be
+adapted without requiring invasive modifications to the operating system
+itself. This also keeps the complexity of memory management completely
+away from the operating system and applications.
+
+There are some operating systems that have built-in support for bank
+switching (e.g., CP/M 3). These operating systems are allowed to make
+use of the bank switched memory and are compatible with HBIOS. However,
+it is necessary that the customization of these operating systems take
+into account the banks of memory used by HBIOS and not attempt to use
+those specific banks.
+
+Note that all code and data are located in RAM memory during normal
+execution. While it is possible to use ROM memory to run code, it would
+require that more upper memory be reserved for data storage. It is
+simpler and more memory efficient to keep everything in RAM. At startup
+(boot) all required code is copied to RAM for subsequent execution.
+
+# Runtime Memory Layout
+
+![Banked Switched Memory Layout](Bank%20Switched%20Memory.png)
+
+# System Boot Process
+
+A multi-phase boot strategy is employed. This is necessary because at
+cold start, the CPU is executing code from ROM in lower memory which is
+the same area that is bank switched.
+
+Boot Phase 1 copies the phase 2 code to upper memory and jumps to it to
+continue the boot process. This is required because the CPU starts at
+address $0000 in low memory. However, low memory is used as the area for
+switching ROM/RAM banks in and out. Therefore, it is necessary to
+relocate execution to high memory in order to initialize the RAM memory
+banks.
+
+Boot Phase 2 manages the setup of the RAM page banks for HBIOS
+operation, performs hardware initialization, and then executes the boot
+loader.
+
+Boot Phase 3 is the loading of the selecting operating system (or debug
+monitor) by the Boot Loader. The Boot Loader is responsible for
+prompting the user to select a target operating system to load, loading
+it into RAM, then transferring control to it. The Boot Loader is capable
+of loading a target operating system from a variety of locations
+including disk drives and ROM.
+
+Note that the entire boot process is entirely operating system agnostic.
+It is unaware of the operating system being loaded. The Boot Loader
+prompts the user for the location of the binary image to load, but does
+not know anything about what is being loaded (the image is usually an
+operating system, but could be any executable code image). Once the Boot
+Loader has loaded the image at the selected location, it will transfer
+control to it. Assuming the typical situation where the image was an
+operating system, the loaded operating system will then perform it’s own
+initialization and begin normal operation.
+
+There are actually two ways to perform a system boot. The first, and
+most commonly used, method is a “ROM Boot”. This refers to booting the
+system directly from the startup code contained on the physical ROM
+chip. A ROM Boot is always performed upon power up or when a hardware
+reset is performed.
+
+Once the system is running (operating system loaded), it is possible to
+reboot the system from a system image contained on the file system. This
+is referred to as an “Application Boot”. This mechanism allows a
+temporary copy of the system to be uploaded and stored on the file
+system of an already running system and then used to boot the system.
+This boot technique is useful to: 1) test a new build of a system image
+before programming it to the ROM; or 2) easily switch between system
+images on the fly.
+
+A more detailed explanation of these two boot processes is presented
+below.
+
+## ROM Boot
+
+At power on (or hardware reset), ROM page 0 is automatically mapped to
+lower memory by hardware level system initialization. Page Zero (first
+256 bytes of the CPU address space) is reserved to contain dispatching
+instructions for interrupt instructions. Address $0000 performs a jump
+to the start of the phase 1 code so that this first page can be
+reserved.
+
+The phase 1 code now copies the phase 2 code from lower memory to upper
+memory and jumps to it. The phase 2 code now initializes the HBIOS by
+copying the ROM resident HBIOS from ROM to RAM. It subsequently calls
+the HBIOS initialization routine. Finally, it starts the Boot Loader
+which prompts the user for the location of the target system image to
+execute.
+
+Once the boot loader transfers control to the target system image, all
+of the Phase 1, Phase 2, and Boot Loader code is abandoned and the space
+it occupied is normally overwritten by the operating system.
+
+## Application Boot
+
+When a new system image is built, one of the output files produced is an
+actual CP/M application (an executable .COM program file). Once you have
+a running CP/M (or compatible) system, you can upload/copy this
+application file to the filesystem. By executing this file, you will
+initiate an Application Boot using the system image contained in the
+application file itself.
+
+Upon execution, the Application Boot program is loaded into memory by
+the previously running operating system starting at $0100. Note that
+program image contains a copy of the HBIOS to be installed and run. Once
+the Application Boot program is loaded by the previous operating system,
+control is passed to it and it performs a system initialization similar
+to the ROM Boot, but using the image loaded in RAM.
+
+Specifically, the code at $0100 (in low memory) copies phase 2 boot code
+to upper memory and transfers control to it. The phase 2 boot code
+copies the HBIOS image from application RAM to RAM, then calls the HBIOS
+initialization routine. At this point, the prior HBIOS code has been
+discarded and overwritten. Finally, the Boot Loader is invoked just like
+a ROM Boot.
+
+## Notes
+
+1.  Size of ROM disk and RAM disk will be decreased as needed to
+    accommodate RAM and ROM memory bank usage for the banked BIOS.
+
+2.  There is no support for interrupt driven drivers at this time. Such
+    support should be possible in a variety of ways, but none are yet
+    implemented.
+
+# Driver Model
+
+The framework code for bank switching also allows hardware drivers to be
+implemented mostly without concern for memory management. Drivers are
+coded to simply implement the HBIOS functions appropriate for the type
+of hardware being supported. When the driver code gets control, it has
+already been mapped to the CPU address space and simply performs the
+requested function based on parameters passed in registers. Upon return,
+the bank switching framework takes care of restoring the original memory
+layout expected by the operating system and application.
+
+However, the one constraint of hardware drivers is that any data buffers
+that are to be returned to the operating system or applications must be
+allocated in high memory. Buffers inside of the driver’s memory bank
+will be swapped out of the CPU address space when control is returned to
+the operating system.
+
+If the driver code must make calls to other code, drivers, or utilities
+in the driver bank, it must make those calls directly (it must not use
+RST 08). This is to avoid a nested bank switch which is not supported at
+this time.
+
+# Character / Emulation / Video Services
+
+In addition to a generic set of routines to handle typical character
+input/output, HBIOS also includes functionality for managing built-in
+video display adapters. To start with there is a basic set of character
+input/output functions, the CIOXXX functions, which allow for simple
+character data streams. These functions fully encompass routing byte
+stream data to/from serial ports. Note that there is a special character
+pseudo-device called “CRT”. When characters are read/written to/from the
+CRT character device, the data is actually passed to a built-in terminal
+emulator which, in turn, utilizes a set of VDA (Video Display Adapter)
+functions (such as cursor positioning, scrolling, etc.).
+
+The following diagram depicts the relationship between these components
+of HBIOS video processing:
+
+![Character / Emulation / Video
+Services](Character%20Emulation%20Video%20Services.png)
+
+Normally, the operating system will simply utilize the CIOXXX functions
+to send and receive character data. The Character I/O Services will
+route I/O requests to the specified physical device which is most
+frequently a serial port (such as UART or ASCI). As shown above, if the
+CRT device is targeted by a CIOXXX function, it will actually be routed
+to the Emulation Services which implement TTY, ANSI, etc. escape
+sequences. The Emulation Services subsequently rely on the Video Display
+Adapter Services as an additional layer of abstraction. This allows the
+emulation code to be completely unaware of the actual physical device
+(device independent). Video Display Adapter (VDA) Services contains
+drivers as needed to handle the available physical video adapters.
+
+Note that the Emulation and VDA Services API functions are available to
+be called directly. Doing so must be done carefully so as to not corrupt
+the “state” of the emulation logic.
+
+Before invoking CIOXXX functions targeting the CRT device, it is
+necessary that the underlying layers (Emulation and VDA) be properly
+initialized. The Emulation Services must be initialized to specify the
+desired emulation and specific physical VDA device to target. Likewise,
+the VDA Services may need to be initialized to put the specific video
+hardware into the proper mode, etc.
+
+# HBIOS Reference
+
+## Invocation
+
+HBIOS functions are invoked by placing the required parameters in CPU
+registers and executing an RST 08 instruction. Note that HBIOS does not
+preserve register values that are unused. However, it must not modify
+the Z80 alternate registers or IX/IY (these registers can be used within
+HBIOS as long as they are saved and restored internally).
+
+Normally, applications will not call HBIOS functions directly. It is
+intended that the operating system makes all HBIOS function calls.
+Applications that are considered system utilities may use HBIOS, but
+must be careful not to modify the operating environment in any way that
+the operating system does not expect.
+
+In general, the desired function is placed in the B register. Register C
+is frequently used to specify a subfunction or a target device number.
+Additional registers are used as defined by the specific function.
+Register A should be used to return function result information. A=0
+should indicate success, other values are function specific.
+
+Some functions utilize pointers to memory buffers. Such memory buffers
+are required to be located in the upper 32K for CPU RAM address space.
+This requirement significantly simplifies the HBIOS proxy and improves
+performance by avoiding “double copies” of buffers.
+
+## Function Overview
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><strong>Character Input/Output (CIO)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Character Input – CIOIN<br />
+Character Output – CIOOUT<br />
+Character Input Status – CIOIST<br />
+Character Output Status – CIOOST<br />
+Character I/O Initialization – CIOINIT<br />
+Character I/O Query – CIOQUERY<br />
+Character I/O Device – CIODEVICE</td>
+</tr>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><strong>Disk Input/Output (DIO)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Disk Status – DIOSTATUS<br />
+Disk Reset – DIORESET<br />
+Disk Seek – DIOSEEK<br />
+Disk Read – DIORD<br />
+Disk Write – DIOWR<br />
+Disk Verify – DIOVERIFY<br />
+Disk Format – DIOFORMAT<br />
+Disk Device – DIODEVICE<br />
+Disk Media – DIOMEDIA<br />
+Disk Define Media – DIODEFMED<br />
+Disk Capacity – DIOCAP<br />
+Disk Geometry – DIOGEOM</td>
+</tr>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><strong>Real Time Clock (RTC)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">RTC Get Time – RTCGETTIM<br />
+RTC Set Time – RTCSETTIM<br />
+RTC Get NVRAM Byte – RTCGETBYT<br />
+RTC Set NVRAM Byte – RTCSETBYT<br />
+RTC Get NVRAM Block – RTCGETBLK<br />
+RTC Set NVRAM Block – RTCSETBLK</td>
+</tr>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><strong>Video Display Adapter (VDA)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">VDA Initialize – VDAINI<br />
+VDA Query – VDAQRY<br />
+VDA Reset – VDARES<br />
+VDA Set Cursor Style – VDASCS<br />
+VDA Set Cursor Position – VDASCP<br />
+VDA Set Character Attribute – VDASAT<br />
+VDA Set Character Color – VDASCO<br />
+VDA Write Character – VDAWRC<br />
+VDA Fill – VDAFIL<br />
+VDA Copy – VDACPY<br />
+VDA Scroll – VDASCR<br />
+VDA Keyboard Status – VDAKST<br />
+VDA Keyboard Flush – VDAKFL<br />
+VDA Keyboard Read – VDAKRD</td>
+</tr>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><strong>System (SYS)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">System Reset – SYSRESET<br />
+System Version – SYSVER<br />
+System Set Bank – SYSSETBNK<br />
+System Get Bank – SYSGETBNK System Set Copy – SYSSETCPY<br />
+System Bank Copy – SYSBNKCPY<br />
+System Alloc – SYSALLOC<br />
+System Free – SYSFREE<br />
+System Get – SYSGET<br />
+System Set – SYSSET<br />
+System Peek – SYSPEEK<br />
+System Poke – SYSPOKE<br />
+System Int – SYSINT</td>
+</tr>
+</tbody>
+</table>
+
+## Character Input/Output (CIO)
+
+Character input/output functions require that a character unit be
+specified in the C register. This is the logical device number assigned
+during the boot process that identifies all character i/o devices
+uniquely. Each character device is handled by an appropriate driver
+(UART, ASCI, etc.) which is identified by a device type id from the
+table below.
+
+<table style="width:46%;">
+<colgroup>
+<col style="width: 12%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><em>Id</em></th>
+<th style="text-align: left;"><em>Device Type / Driver</em></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">0x00<br />
+0x10<br />
+0x20<br />
+0x30<br />
+0x40<br />
+0x50<br />
+0x60<br />
+0xD0</td>
+<td style="text-align: left;">UART<br />
+ASCI<br />
+PropIO VGA<br />
+Terminal<br />
+ParPortProp VGA<br />
+SIO<br />
+ACIA<br />
+Console</td>
+</tr>
+</tbody>
+</table>
+
+Character devices can usually be configured with line characteristics
+such as speed, framing, etc. A word value (16 bit) is used to describe
+the line characteristics as indicated below:
+
+<table style="width:58%;">
+<colgroup>
+<col style="width: 12%" />
+<col style="width: 45%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><em>Bits</em></th>
+<th style="text-align: left;"><em>Function</em></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">15-14<br />
+13<br />
+12-8<br />
+7<br />
+6<br />
+5-3<br />
+2<br />
+1-0</td>
+<td style="text-align: left;">Reserved (set to 0)<br />
+RTS<br />
+Baud Rate (see below)<br />
+DTR<br />
+XON/XOFF Flow Control<br />
+Parity (???)<br />
+Stop Bits (???)<br />
+Data Bits (???)</td>
+</tr>
+</tbody>
+</table>
+
+The 5-bit baud rate value (V) is encoded as V = 75 \* 2^X \* 3^Y. The
+bits are defined as YXXXX.
+
+**Function 0x00 – Character Input (CIOIN)**
+
+*Entry Parameters*  
+      B: 0x00  
+      C: Serial Device Unit Number
+
+*Exit Results*  
+      A: Status  
+      E: Character Received
+
+Read a character from the device unit specified in register C and return
+the character value in E. If no character(s) are available, this
+function will wait indefinitely.
+
+**Function 0x01 – Character Output (CIOOUT)**
+
+*Entry Parameters*  
+      B: 0x01  
+      C: Serial Device Unit Number  
+      E: Character to Send
+
+*Exit Results*  
+      A: Status
+
+Send character value in register E to device specified in register C. If
+device is not ready to send, function will wait indefinitely.
+
+**Function 0x02 – Character Input Status (CIOIST)**
+
+*Entry Parameters*  
+      B: 0x02  
+      C: Serial Device Unit Number
+
+*Exit Results*  
+      A: Status
+
+Return the number of characters available to read in the input buffer of
+the unit specified. If the device has no input buffer, it is acceptable
+to return simply 0 or 1 where 0 means there is no character available to
+read and 1 means there is at least one character available to read.
+
+**Function 0x03 – Character Output Status (CIOOST)**
+
+*Entry Parameters*  
+      B: 0x03  
+      C: Serial Device Unit Number
+
+*Exit Results*  
+      A: Status
+
+Return the space available in the output buffer expressed as a character
+count. If a 16 byte output buffer contained 6 characters waiting to be
+sent, this function would return 10, the number of positions available
+in the output buffer. If the port has no output buffer, it is acceptable
+to return simply 0 or 1 where 0 means the port is busy and 1 means the
+port is ready to output a character.
+
+**Function 0x04 – Character IO Initialization (CIOINIT)**
+
+*Entry Parameters*  
+      B: 0x04  
+      C: Serial Device Unit Number  
+      DE: Line Characteristics
+
+*Exit Results*  
+      A: Status
+
+Setup line characteristics (baudrate, framing, etc.) of the specified
+unit. Register pair DE specifies line characteristics. If DE contains -1
+(0xFFFF), then the device will be reinitialized with the last line
+characteristics used. Result of function is returned in A with zero
+indicating success.
+
+**Function 0x05 – Character IO Query (CIOQUERY)**
+
+*Entry Parameters*  
+      B: 0x05  
+      C: Serial Device Unit Number
+
+*Exit Results*  
+      A: Status  
+      DE: Line Characteristics
+
+Reports the line characteristics (baudrate, framing, etc.) of the
+specified unit. Register pair DE contains the line characteristics upon
+return.
+
+**Function 0x06 – Character IO Device (CIODEVICE)**
+
+*Entry Parameters*  
+      B: 0x06  
+      C: Serial Device Unit Number
+
+*Exit Results*  
+      A: Status  
+      C: Serial Device Attributes  
+      D: Serial Device Type  
+      E: Serial Device Number
+
+Reports information about the character device unit specified. Register
+C indicates the device attributes: 0=RS-232 and 1=Terminal. Register D
+indicates the device type (driver) and register E indicates the physical
+device number assigned by the driver.
+
+## Disk Input/Output (DIO)
+
+Character input/output functions require that a character unit be
+specified in the C register. This is the logical disk unit number
+assigned during the boot process that identifies all disk i/o devices
+uniquely. Each disk device is handled by an appropriate driver (IDE, SD,
+etc.) which is identified by a device type id from the table below.
+
+| **Type ID** | **Disk Device Type**         |
+| ----------- | :--------------------------- |
+| 0x00        | Memory Disk                  |
+| 0x10        | Floppy Disk                  |
+| 0x20        | RAM Floppy                   |
+| 0x30        | IDE Disk                     |
+| 0x40        | ATAPI Disk (not implemented) |
+| 0x50        | PPIDE Disk                   |
+| 0x60        | SD Card                      |
+| 0x70        | PropIO SD Card               |
+| 0x80        | ParPortProp SD Card          |
+| 0x90        | SIMH HDSK Disk               |
+
+The currently defined media types are:
+
+| **Media ID** | **Value** | **Format**         |
+| :----------- | :-------- | :----------------- |
+| MID\_NONE    | 0         | No media installed |
+| MID\_MDROM   | 1         | ROM Drive          |
+| MID\_MDRAM   | 2         | RAM Drive          |
+| MID\_RF      | 3         | RAM Floppy (LBA)   |
+| MID\_HD      | 4         | Hard Disk (LBA)    |
+| MID\_FD720   | 5         | 3.5" 720K Floppy   |
+| MID\_FD144   | 6         | 3.5" 1.44M Floppy  |
+| MID\_FD360   | 7         | 5.25" 360K Floppy  |
+| MID\_FD120   | 8         | 5.25" 1.2M Floppy  |
+| MID\_FD111   | 9         | 8" 1.11M Floppy    |
+
+**Function 0x10 – Disk Status (DIOSTATUS)**
+
+*Entry Parameters*  
+      B: 0x10
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)
+
+**Function 0x11 – Disk Status (DIORESET)**
+
+*Entry Parameters*  
+      B: 0x11  
+      C: Disk Device Unit ID
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)
+
+Reset the physical interface associated with the specified unit. Flag
+all units associated with the interface for unit initialization at next
+I/O call. Clear media identified unless locked. Reset result code of all
+associated units of the physical interface.
+
+**Function 0x12 – Disk Seek (DIOSEEK)**
+
+*Entry Parameters*  
+      B: 0x12  
+      C: Disk Device Unit ID  
+      D7: Address Type (0=CHS, 1=LBA)
+
+      if CHS:  
+          D6-0: Head  
+          E: Sector  
+          HL: Track
+
+      if LBA:  
+          DE:HL: Block Address
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)
+
+Update target CHS or LBA for next I/O request on designated unit.
+Physical seek is typically deferred until subsequent I/O operation.
+
+Bit 7 of D indicates whether the disk seek address is specified as
+cylinder/head/sector (CHS) or Logical Block Address (LBA). If D:7=1,
+then the remaining bits of of the 32 bit register set DE:HL specify a
+linear, zero offset, block number. If D:7=0, then the remaining bits of
+D specify the head, E specifies sector, and HL specifies track.
+
+Note that not all devices will accept both types of addresses.
+Specifically, floppy disk devices must have CHS addresses. All other
+devices will accept either CHS or LBA. The DIOGEOM function can be used
+to determine if the device supports LBA addressing.
+
+**Function 0x13 – Disk Read (DIOREAD)**
+
+*Entry Parameters*  
+      B: 0x13  
+      C: Disk Device Unit ID  
+      HL: Buffer Address  
+      E: Block Count
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)  
+      E: Blocks Reaad
+
+Read Block Count sectors to buffer address starting at current target
+sector. Current sector must be established by prior seek function;
+however, multiple read/write/verify function calls can be made after a
+seek function. Current sector is incremented after each sector
+successfully read. On error, current sector is sector is sector where
+error occurred. Blocks read indicates number of sectors successfully
+read.
+
+Caller must ensure: 1) buffer address is large enough to contain data
+for all sectors requested, and 2) entire buffer area resides in upper
+32K of memory.
+
+**Function 0x14 – Disk Seek (DIOWRITE)**
+
+*Entry Parameters*  
+      B: 0x14  
+      C: Disk Device Unit ID  
+      HL: Buffer Address  
+      E: Block Count
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)  
+      E: Blocks Written
+
+Write Block Count sectors to buffer address starting at current target
+sector. Current sector must be established by prior seek function;
+however, multiple read/write/verify function calls can be made after a
+seek function. Current sector is incremented after each sector
+successfully written. On error, current sector is sector is sector where
+error occurred. Blocks written indicates number of sectors successfully
+written.
+
+Caller must ensure: 1) buffer address is large enough to contain data
+for all sectors being written, and 2) entire buffer area resides in
+upper 32K of memory.
+
+**Function 0x15 – Disk Verify (DIOVERIFY)**
+
+*Entry Parameters*  
+      B: 0x15  
+      C: Disk Device Unit ID  
+      HL: Buffer Address  
+      E: Block Count
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)  
+      E: Blocks Verified
+
+\*\*\*Not Implemented\*\*\*
+
+**Function 0x16 – Disk Format (DIOFORMAT)**
+
+*Entry Parameters*  
+      B: 0x16  
+      C: Disk Device Unit ID  
+      D: Head  
+      E: Fill Byte  
+      HL: Cylinder
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)
+
+\*\*\*Not Implemented\*\*\*
+
+**Function 0x17 – Disk DEVICE (DIODEVICE)**
+
+*Entry Parameters*  
+      B: 0x17  
+      C: Disk Device Unit ID
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)  
+      C: Attributes  
+      D: Device Type  
+      E: Device Number
+
+Reports information about the character device unit specified. Register
+D indicates the device type (driver) and register E indicates the
+physical device number assigned by the driver.
+
+Register C reports the following device attributes:
+
+Bit 7: 1=Floppy, 0=Hard Disk (or similar, e.g. CF, SD, RAM)
+
+If Floppy:  
+    Bits 6-5: Form Factor (0=8“, 1=5.25”, 2=3.5", 3=Other)  
+    Bit 4: Sides (0=SS, 1=DS)  
+    Bits 3-2: Density (0=SD, 1=DD, 2=HD, 3=ED)  
+    Bits 1-0: Reserved
+
+If Hard Disk:  
+    Bit 6: Removable\\  
+    Bits: 5-3: Type (0=Hard, 1=CF, 2=SD, 3=USB,  
+                     4=ROM, 5=RAM, 6=RAMF, 7=Reserved)  
+    Bits 2-0: Reserved
+
+**Function 0x18 – Disk Media (DIOMEDIA)**
+
+*Entry Parameters*  
+      B: 0x18  
+      C: Disk Device Unit ID  
+      E0: Enable Media Discovery
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)  
+      E: Media ID
+
+Report the media definition for media in specified unit. If bit 0 of E
+is set, then perform media discovery or verification. If no media in
+device, return no media error.
+
+**Function 0x19 – Disk Define Media (DIODEFMED)**
+
+*Entry Parameters*  
+      B: 0x19  
+      C: Disk Device Unit ID  
+      E: Media ID
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)
+
+\*\*\* Not implemented \*\*\*
+
+**Function 0x1A – Disk Media (DIOCAPACITY)**
+
+*Entry Parameters*  
+      B: 0x1A  
+      C: Disk Device Unit ID  
+      HL: Buffer Address
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)  
+      DE:HL: Blocks on Device  
+      BC: Block Size
+
+Report current media capacity information. DE:HL is a 32 bit number
+representing the total number of blocks on the device. BC contains the
+block size. If media is unknown, an error will be returned.
+
+**Function 0x1B – Disk Geometry (DIOGEOMETRY)**
+
+*Entry Parameters*  
+      B: 0x1B  
+      C: Disk Device Unit ID
+
+*Exit Results*  
+      A: Status (0=OK, 1=Error)  
+      HL: Cylinders  
+      D7: LBA Capability  
+      BC: Block Size
+
+Report current media geometry information. If media is unknown, return
+error (no media).
+
+## Real Time Clock (RTC)
+
+The Real Time Clock functions provide read/write access to the clock and
+related Non-Volatile RAM.
+
+The time functions (RTCGTM and RTCSTM) require a 6 byte date/time buffer
+of the following format. Each byte is BCD encoded.
+
+| **Offset** | **Contents**    |
+| :--------- | :-------------- |
+| 0          | Year (00-99)    |
+| 1          | Month (01-12)   |
+| 2          | Date (01-31)    |
+| 3          | Hours (00-24)   |
+| 4          | Minutes (00-59) |
+| 5          | Seconds (00-59) |
+
+**Function 0x20 – RTC Get Time (RTCGETTIM)**
+
+*Entry Parameters*  
+      B: 0x20  
+      HL: Time Buffer Address
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Read the current value of the clock and store the date/time in the
+buffer pointed to by HL.
+
+**Function 0x21 – RTC Set Time (RTCSETTIM)**
+
+*Entry Parameters*  
+      B: 0x21  
+      HL: Time Buffer Address
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Set the current value of the clock based on the date/time in the buffer
+pointed to by HL.
+
+**Function 0x22 – RTC Get NVRAM Byte (RTCGETBYT)**
+
+*Entry Parameters*  
+      B: 0x22  
+      C: Index
+
+*Exit Results*  
+      A: Status (0=OK, else error)  
+      E: Value
+
+Read a single byte value from the Non-Volatile RAM at the index
+specified by C. The value is returned in register E.
+
+**Function 0x23 – RTC Set NVRAM Byte (RTCSETBYT)**
+
+*Entry Parameters*  
+      B: 0x23  
+      C: Index
+
+*Exit Results*  
+      A: Status (0=OK, else error)  
+      E: Value
+
+Write a single byte value into the Non-Volatile RAM at the index
+specified by C. The value to be written is specified in E.
+
+**Function 0x24 – RTC Get NVRAM Block (RTCGETBLK)**
+
+*Entry Parameters*  
+      B: 0x24  
+      HL: Buffer
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Read the entire contents of the Non-Volatile RAM into the buffer pointed
+to by HL. HL must point to a location in the top 32K of CPU address
+space.
+
+**Function 0x25 – RTC Set NVRAM Block (RTCSETBLK)**
+
+*Entry Parameters*  
+      B: 0x25  
+      HL: Buffer
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Write the entire contents of the Non-Volatile RAM from the buffer
+pointed to by HL. HL must point to a location in the top 32K of CPU
+address space.
+
+## Video Display Adapter (VDA)
+
+The VDA functions are provided as a common interface to Video Display
+Adapters. Not all VDAs will include keyboard hardware. In this case, the
+keyboard functions should return a failure status.
+
+The VDA functions require that a VDA device/unit be specified in the C
+register. The upper nibble (upper 4 bits) specifies the device. The
+lower nibble specifies the unit (not currently used).
+
+The currently defined video devices are:
+
+| VDA ID    | Value | Device                               |
+| :-------- | :---- | :----------------------------------- |
+| VDA\_NONE | 0     | No VDA                               |
+| VDA\_VDU  | 1     | ECB VDU board                        |
+| VDA\_CVDU | 2     | ECB Color VDU board                  |
+| VDA\_7220 | 3     | ECB uPD7220 video display board      |
+| VDA\_N8   | 4     | TMS9918 video display built-in to N8 |
+
+Depending on the capabilities of the hardware, the use of colors and
+attributes may or may not be supported. If the hardware does not support
+these capabilities, they will be ignored.
+
+Color byte values are constructed using typical RGBI
+(Red/Green/Blue/Intensity) bits. The high four bits of the value
+determine the background color and the low four bits determine the
+foreground color. This results in 16 unique color values for both
+foreground and background. The following table illustrates the color
+byte value construction:
+
+|            | **Bit** | **Color** |
+| ---------- | :------ | :-------- |
+| Background | 7       | Intensity |
+|            | 6       | Blue      |
+|            | 5       | Green     |
+|            | 4       | Red       |
+| Foreground | 3       | Intensity |
+|            | 2       | Blue      |
+|            | 1       | Green     |
+|            | 0       | Red       |
+
+The following table illustrates the resultant color for each of the
+possible 16 values for foreground or background:
+
+| **Foreground**   | **Background**   | **Color**     |
+| :--------------- | :--------------- | :------------ |
+| \_0 \_\_\_\_0000 | 0\_ 0000\_\_\_\_ | Black         |
+| \_1 \_\_\_\_0001 | 1\_ 0001\_\_\_\_ | Red           |
+| \_2 \_\_\_\_0010 | 2\_ 0010\_\_\_\_ | Green         |
+| \_3 \_\_\_\_0011 | 3\_ 0011\_\_\_\_ | Brown         |
+| \_4 \_\_\_\_0100 | 4\_ 0100\_\_\_\_ | Blue          |
+| \_5 \_\_\_\_0101 | 5\_ 0101\_\_\_\_ | Magenta       |
+| \_6 \_\_\_\_0110 | 6\_ 0110\_\_\_\_ | Cyan          |
+| \_7 \_\_\_\_0111 | 7\_ 0111\_\_\_\_ | White         |
+| \_8 \_\_\_\_1000 | 8\_ 1000\_\_\_\_ | Gray          |
+| \_9 \_\_\_\_1001 | 9\_ 1001\_\_\_\_ | Light Red     |
+| \_A \_\_\_\_1010 | A\_ 1010\_\_\_\_ | Light Green   |
+| \_B \_\_\_\_1011 | B\_ 1011\_\_\_\_ | Yellow        |
+| \_C \_\_\_\_1100 | C\_ 1100\_\_\_\_ | Light Blue    |
+| \_D \_\_\_\_1101 | D\_ 1101\_\_\_\_ | Light Magenta |
+| \_E \_\_\_\_1110 | E\_ 1110\_\_\_\_ | Light Cyan    |
+| \_F \_\_\_\_1111 | F\_ 1111\_\_\_\_ | Bright White  |
+
+Attribute byte values are constructed using the following bit encoding:
+
+| **Bit** | **Effect** |
+| :------ | :--------- |
+| 7       | n/a (0)    |
+| 6       | n/a (0)    |
+| 5       | n/a (0)    |
+| 4       | n/a (0)    |
+| 3       | n/a (0)    |
+| 2       | Reverse    |
+| 1       | Underline  |
+| 0       | Blink      |
+
+The following codes are returned by a keyboard read to signify non-ASCII
+keystrokes:
+
+| **Value** | **Keystroke** | **Value** | **Keystroke** |
+| :-------- | :------------ | :-------- | :------------ |
+| E0        | F1            | F0        | Insert        |
+| E1        | F2            | F1        | Delete        |
+| E2        | F3            | F2        | Home          |
+| E3        | F4            | F3        | End           |
+| E4        | F5            | F4        | PageUp        |
+| E5        | F6            | F5        | PadeDown      |
+| E6        | F7            | F6        | UpArrow       |
+| E7        | F8            | F7        | DownArrow     |
+| E8        | F9            | F8        | LeftArrow     |
+| E9        | F10           | F9        | RightArrow    |
+| EA        | F11           | FA        | Power         |
+| EB        | F12           | FB        | Sleep         |
+| EC        | SysReq        | FC        | Wake          |
+| ED        | PrintScreen   | FD        | Break         |
+| EE        | Pause         | FE        |               |
+| EF        | App           | FF        |               |
+
+**Function 0x40 – Video Initialize (VDAINI)**
+
+*Entry Parameters*  
+      B: 0x40  
+      C: Video Device Unit ID  
+      E: Video Mode (device specific)  
+      HL: Font Bitmap Buffer Address (optional)
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Performs a full (re)initialization of the specified video device. The
+screen is cleared and the keyboard buffer is flushed. If the specified
+VDA supports multiple video modes, the requested mode can be specified
+in E (set to 0 for default/not specified). Mode values are specific to
+each VDA.
+
+HL may point to a location in memory with the character bitmap to be
+loaded into the VDA video processor. The location MUST be in the top 32K
+of the CPU memory space. HL must be set to zero if no character bitmap
+is specified (the VDA video processor will utilize a default character
+bitmap).
+
+**Function 0x41 – Video Query (VDAQRY)**
+
+*Entry Parameters*  
+      B: 0x41  
+      C: Video Device Unit ID  
+      HL: Font Bitmap Buffer Address (optional)
+
+*Exit Results*  
+      A: Status (0=OK, else error)  
+      C: Video Mode  
+      D: Row Count  
+      E: Column Count  
+      HL: Font Bitmap Buffer Address (0 if N/A)
+
+Return information about the specified video device. C will be set to
+the current video mode. DE will return the dimensions of the video
+display as measured in rows and columns. Note that this is the **count**
+of rows and columns, not the **last** row/column number.
+
+If HL is not zero, it must point to a suitably sized memory buffer in
+the upper 32K of CPU address space that will be filled with the current
+character bitmap data. It is critical that HL be set to zero if it does
+not point to a proper buffer area or memory corruption will result. The
+video device driver may not have the ability to provide character bitmap
+data. In this case, on return, HL will be set to zero.
+
+**Function 0x42 – Video Reset (VDARES)**
+
+*Entry Parameters*  
+      B: 0x42  
+      C: Video Device Unit ID
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Performs a soft reset of the Video Display Adapter. Should clear the
+screen, home the cursor, restore active attribute and color to defaults.
+Keyboard should be flushed.
+
+**Function 0x43 – Video Set Cursor Style (VDASCS)**
+
+*Entry Parameters*  
+      B: 0x43  
+      C: Video Device Unit ID  
+      D: Start/End Pixel Row  
+      E: Style
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+If supported by the video hardware, adjust the format of the cursor such
+that the cursor starts at the pixel specified in the top nibble of D and
+end at the pixel specified in the bottom nibble of D. So, if D=$08, a
+block cursor would be used that starts at the top pixel of the character
+cell and ends at the ninth pixel of the character cell.
+
+Register E is reserved to control the style of the cursor (blink,
+visibility, etc.), but is not yet implemented.
+
+Adjustments to the cursor style may or may not be possible for any given
+video hardware.
+
+**Function 0x44 – Video Set Cursor Position (VDASCP)**
+
+*Entry Parameters*  
+      B: 0x44  
+      C: Video Device Unit ID  
+      D: Row (0 indexed)  
+      E: Column (0 indexed)
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Reposition the cursor to the specified row and column. Specifying a
+row/column that exceeds the boundaries of the display results in
+undefined behavior. Cursor coordinates are 0 based (0,0 is the upper
+left corner of the display).
+
+**Function 0x45 – Video Set Character Attribute (VDASAT)**
+
+*Entry Parameters*  
+      B: 0x45  
+      C: Video Device Unit ID  
+      E: Character Attribute Code
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Assign the specified character attribute code to be used for all
+subsequent character writes/fills. This attribute is used to fill new
+lines generated by scroll operations. Refer to the character attribute
+for a list of the available attribute codes. Note that a given video
+display may or may not support any/all attributes.
+
+**Function 0x46 – Video Set Character Color (VDASCO)**
+
+*Entry Parameters*  
+      B: 0x46  
+      C: Video Device Unit ID  
+      E: Character Color Code
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Assign the specified color code to be used for all subsequent character
+writes/fills. This color is also used to fill new lines generated by
+scroll operations. Refer to color code table for a list of the available
+color codes. Note that a given video display may or may not support
+any/all colors.
+
+**Function 0x47 – Video Set Write Character (VDAWRC)**
+
+*Entry Parameters*  
+      B: 0x47  
+      C: Video Device Unit ID  
+      E: Character
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Write the character specified in E. The character is written starting at
+the current cursor position and the cursor is advanced. If the end of
+the line is encountered, the cursor will be advanced to the start of the
+next line. The display will **not** scroll if the end of the screen is
+exceeded.
+
+**Function 0x48 – Video Fill (VDAFIL)**
+
+*Entry Parameters*  
+      B: 0x48  
+      C: Video Device Unit ID  
+      E: Character  
+      HL: Count
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Write the character specified in E to the display the number of times
+specified in HL. Characters are written starting at the current cursor
+position and the cursor is advanced by the number of characters written.
+If the end of the line is encountered, the characters will continue to
+be written starting at the next line as needed. The display will **not**
+scroll if the end of the screen is exceeded.
+
+**Function 0x49 – Video Copy (VDACPY)**
+
+*Entry Parameters*  
+      B: 0x49  
+      C: Video Device Unit ID  
+      D: Source Row  
+      E: Source Column  
+      L: Count
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Copy count (L) bytes from the source row/column (DE) to current cursor
+position. The cursor position is not updated. The maximum count is 255.
+Copying to/from overlapping areas is not supported and will have an
+undefined behavior. The display will **not** scroll if the end of the
+screen is exceeded. Copying beyond the active screen buffer area is not
+supported and results in undefined behavior.
+
+**Function 0x4A – Video Scroll (VDASCR)**
+
+*Entry Parameters*  
+      B: 0x4A  
+      C: Video Device Unit ID  
+      E: Scroll Distance (Line Count)
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Scroll the video display by the number of lines specified in E. If E
+contains a negative number, then reverse scroll should be performed.
+
+**Function 0x4B – Video Keyboard Status (VDAKST)**
+
+*Entry Parameters*  
+      B: 0x4B  
+      C: Video Device Unit ID
+
+*Exit Results*  
+      A: Status (\# Key Codes in Keyboard Buffer)
+
+Return a count of the number of key codes in the keyboard buffer. If it
+is not possible to determine the actual number in the buffer, it is
+acceptable to return 1 to indicate there are key codes available to read
+and 0 if there are none available.
+
+**Function 0x4C – Video Keyboard Flush (VDAKFL)**
+
+*Entry Parameters*  
+      B: 0x4C  
+      C: Video Device Unit ID
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+If a keyboard buffer is in use, it should be purged and all contents
+discarded.
+
+**Function 0x4D – Video Keyboard Read (VDAKRD)**
+
+*Entry Parameters*  
+      B: 0x4D  
+      C: Video Device Unit ID
+
+*Exit Results*  
+      A: Status (0=OK, else error)  
+      C: Scancode  
+      D: Keystate  
+      E: Keycode
+
+Read next key code from keyboard. If a keyboard buffer is used, return
+the next key code in the buffer. If no key codes are available, wait for
+a keypress and return the keycode.
+
+The scancode value is the raw scancode from the keyboard for the
+keypress. Scancodes are from scancode set 2 standard.
+
+The keystate is a bitmap representing the value of all modifier keys and
+shift states as they existed at the time of the keystroke. The bitmap is
+defined as:
+
+| Bit | Keystate Indication              |
+| --- | :------------------------------- |
+| 7   | Key pressed was from the num pad |
+| 6   | Caps Lock was active             |
+| 5   | Num Lock was active              |
+| 4   | Scroll Lock was active           |
+| 3   | Windows key was held down        |
+| 2   | Alt key was held down            |
+| 1   | Control key was held down        |
+| 0   | Shift key was held down          |
+
+Keycodes are generally returned as appropriate ASCII values, if
+possible. Special keys, like function keys, are returned as reserved
+codes as described at the start of this section.
+
+## System (SYS)
+
+**Function 0xF0 – System Reset (SYSRESET)**
+
+*Entry Parameters*  
+      B: 0xF0
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Perform a soft reset of HBIOS. Releases all HBIOS memory allocated by
+current OS. Does not reinitialize physical devices.
+
+**Function 0xF1 – System Version (SYSVER)**
+
+*Entry Parameters*  
+      B: 0xF1  
+      C: Reserved (set to 0)
+
+*Exit Results*  
+      A: Status (0=OK, else error)  
+      DE: Version (Maj/Min/Upd/Pat)  
+      L: Platform ID
+
+This function will return the HBIOS version number. The version number
+is returned in DE. High nibble of D is the major version, low nibble of
+D is the minor version, high nibble of E is the patch number, and low
+nibble of E is the build number.
+
+The hardware platform is identified in L:
+
+| Id | Platform       |
+| -- | :------------- |
+| 1  | SBC V1 or V2   |
+| 2  | ZETA           |
+| 3  | ZETA 2         |
+| 4  | N8             |
+| 5  | MK4            |
+| 6  | UNA            |
+| 7  | RC2014 w/ Z80  |
+| 8  | RC2014 w/ Z180 |
+
+**Function 0xF2 – System Set Bank (SYSSETBNK)**
+
+*Entry Parameters*  
+      B: 0xF2  
+      C: Bank ID
+
+*Exit Results*  
+      A: Status (0=OK, else error)  
+      C: Previously Active Bank ID
+
+Activates the Bank ID specified in C and returns the previously active
+Bank ID in C. The caller MUST be invoked from code located in the upper
+32K and the stack **must** be in the upper 32K.
+
+**Function 0xF3 – System Get Bank (SYSGETBNK)**
+
+*Entry Parameters*  
+      B: 0xF3
+
+*Exit Results*  
+      A: Status (0=OK, else error)  
+      C: Active Bank ID
+
+Returns the currently active Bank ID in C.
+
+**Function 0xF4 – System Set Copy (SYSSETCPY)**
+
+*Entry Parameters*  
+      B: 0xF4  
+      D: Destination Bank ID  
+      E: Source Bank ID  
+      HL: Count of Bytes to Copy
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Prepare for a subsequent interbank memory copy (SYSBNKCPY) function by
+setting the source bank, destination bank, and byte count for the copy.
+The bank id’s are not range checked and must be valid for the system in
+use.
+
+No bytes are copied by this function. The SYSBNKCPY must be called to
+actually perform the copy. The values setup by this function will remain
+unchanged until another call is make to this function. So, after calling
+SYSSETCPY, you may make multiple calls to SYSBNKCPY as long as you want
+to continue to copy between the already established Source/Destination
+Banks and the same size copy if being performed.
+
+**Function 0xF5 – System Bank Copy (SYSBNKCPY)**
+
+*Entry Parameters*  
+      B: 0xF5  
+      DE: Destination Address  
+      HL: Source Address
+
+*Exit Results*  
+      A: Status (0=OK, else error)
+
+Copy memory between banks. The source bank, destination bank, and byte
+count to copy MUST be established with a prior call to SYSSETCPY.
+However, it is not necessary to call SYSSETCPY prior to subsequent calls
+to SYSBNKCPY if the source/destination banks and copy length do not
+change.
+
+WARNINGS:
+
+  - This function is inherently dangerous and does not prevent you from
+    corrupting critical areas of memory. Use with **extreme** caution.
+
+  - Overlapping source and destination memory ranges are not supported
+    and will result in undetermined behavior.
+
+  - Copying of byte ranges that cross bank boundaries is undefined.
+
+**Function 0xF6 – System Alloc (SYSALLOC)**
+
+*Entry Parameters*  
+      B: 0xF6  
+      HL: Size in Bytes
+
+*Exit Results*  
+      A: Status (0=OK, else error)  
+      HL: Address of Allocated Memory
+
+This function will attempt to allocate a block of memory of HL bytes
+from the internal HBIOS heap. The HBIOS heap resides in the HBIOS bank
+in the area of memory left unused by HBIOS. If the allocation is
+successful, the address of the allocated memory block is returned in HL.
+You will typically want to use the SYSBNKCPY function to read/write the
+allocated memory.
+
+**Function 0xF7 – System Free (SYSFREE)**
+
+     *Entry Parameters*  
+          B: 0xF7  
+          HL: Address of Memory Block to Free
+
+     *Returned Values*  
+          A: Status (0=OK, else error)
+
+\*\*\* This function is not yet implemented \*\*\*
+
+**Function 0xF8 – System Get (SYSGET)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: Subfunction (see below)
+
+     *Returned Values*  
+          A: Status (0=OK, else error)
+
+This function will report various system information based on the
+sub-function value. The following lists the subfunctions available along
+with the registers/information returned.
+
+**SYSGET Subfunction 0x00 – Get Serial Device Unit Count (CIOCNT)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: 0x00
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          E: Count of Serial Device Units
+
+**SYSGET Subfunction 0x10 – Get Disk Device Unit Count (DIOCNT)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: 0x10
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          E: Count of Disk Device Units
+
+**SYSGET Subfunction 0x40 – Get Video Device Unit Count (VDACNT)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: 0x40
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          E: Count of Video Device Units
+
+**SYSGET Subfunction 0xD0 – Get Timer Tick Count (TIMER)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: 0xD0
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          DE:HL: Current Timer Tick Count Value
+
+**SYSGET Subfunction 0xE0 – Get Boot Information (BOOTINFO)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: 0xE0
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          L: Boot Bank ID  
+          D: Boot Disk Device Unit ID  
+          E: Boot Disk Slice
+
+**SYSGET Subfunction 0xF0 – Get CPU Information (CPUINFO)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: 0xF0
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          H: Z80 CPU Variant  
+          L: CPU Speed in MHz  
+          DE: CPU Speed in KHz
+
+**SYSGET Subfunction 0xF1 – Get Memory Information (MEMINFO)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: 0xF1
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          D: Count of 32K ROM Banks  
+          E: Count of 32K RAM Banks
+
+**SYSGET Subfunction 0xF2 – Get Bank Information (BNKINFO)**
+
+     *Entry Parameters*  
+          B: 0xF8  
+          C: 0xF2
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          D: BIOS Bank ID  
+          E: User Bank ID
+
+**Function 0xF9 – System Set (SYSSET)**
+
+     *Entry Parameters*  
+          B: 0xF9  
+          C: Subfunction (see below)
+
+     *Returned Values*  
+          A: Status (0=OK, else error)
+
+This function will set various system parameters based on the
+sub-function value. The following lists the subfunctions available along
+with the registers/information used as input.
+
+**SYSGET Subfunction 0xD0 – Set Timer Tick Count (TIMER)**
+
+     *Entry Parameters*  
+          B: 0xF9  
+          C: 0xD0  
+          DE:HL: Timer Tick Count Value
+
+     *Returned Values*  
+          A: Status (0=OK, else error)
+
+**SYSGET Subfunction 0xE0 – Set Boot Information (BOOTINFO)**
+
+     *Entry Parameters*  
+          B: 0xF9  
+          C: 0xE0  
+          L: Boot Bank ID  
+          D: Boot Disk Device Unit ID  
+          E: Boot Disk Slice
+
+     *Returned Values*  
+          A: Status (0=OK, else error)
+
+**Function 0xFA – System Peek (SYSPEEK)**
+
+     *Entry Parameters*  
+          B: 0xFA  
+          D: Bank ID  
+          HL: Memory Address
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          E: Byte Value
+
+This function gets a single byte value at the specified bank/address.
+The bank specified is not range checked.
+
+**Function 0xFB – System Poke (SYSPOKE)**
+
+     *Entry Parameters*  
+          B: 0xFB  
+          D: Bank ID  
+          E: Value  
+          HL: Memory Address
+
+     *Returned Values*  
+          A: Status (0=OK, else error)
+
+This function sets a single byte value at the specified bank/address.
+The bank specified is not range checked.
+
+**Function 0xFC – System Interrupt Management (SYSINT)**
+
+     *Entry Parameters*  
+          B: 0xFC  
+          C: Subfunction (see below)
+
+     *Returned Values*  
+          A: Status (0=OK, else error)
+
+This function allows the caller to query information about the interrupt
+configuration of the running system and allows adding interrupt vectors
+dynamically. Register C is used to specify a subfunction. Additional
+input and output registers may be used as defined by the sub-function.
+
+Note that during interrupt processing, the lower 32K of CPU address
+space will contain the RomWBW HBIOS code bank, not the lower 32K of
+application TPA. As such, a dynamically installed interrupt handler does
+not have access to the lower 32K of TPA and must be careful to avoid
+modifying the contents of the lower 32K of memory. Invoking RomWBW HBIOS
+functions within an interrupt handler is not supported. The interrupt
+management framework takes care of saving and restoring AF, BC, DE, HL,
+and IY. Any other registers modified must be saved and restored by the
+interrupt handler.
+
+Interrupt handlers are different for IM1 or IM2.
+
+For IM1:
+
+> The new interrupt handler is responsible for chaining (JP) to the
+> previous vector if the interrupt is not handled. The interrupt handler
+> must return with ZF set if interrupt is handled and ZF cleared if not
+> handled.
+
+For IM2:
+
+> The interrupt handler requires an invocation stub separate from the
+> actual interrupt handling code. The stub must be:
+
+``` 
+        PUSH HL
+        LD HL,<adr of actual interrupt handler>
+        JP <adr of int routing engine>
+```
+
+> When calling Set Interrupt Vector, the address of the stub must be
+> provided for the Interrupt Vector parameter. The address of the
+> Interrupt Routing Engine will be returned in DE and must be inserted
+> into the stub code as indicated above. In the case of IM2 mode
+> interrupts, the actual interrupt handler should not chain to the
+> previous entry. The new interrupt handler must assume all
+> responsibilities for the specific interrupt slot being occupied.
+
+If the caller is transient, then the caller must remove the new
+interrupt handler and restore the original one prior to termination.
+This is accomplished by calling this function with the Interrupt Vector
+set to the Previous Vector returned in the original call.
+
+The caller is responsible for disabling interrupts prior to making an
+INTSET call and enabling them afterwards. The caller is responsible for
+ensuring that a valid interrupt handler is installed prior to enabling
+any hardware interrupts associated with the handler. Also, if the
+handler is transient, the caller must disable the hardware interrupt(s)
+associated with the handler prior to uninstalling it.
+
+**SYSINT Subfunction 0x00 – Interrupt Info (INTINF)**
+
+     *Entry Parameters*  
+          B: 0xFC  
+          C: 0x00
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          D: Interrupt Mode  
+          E: Size (\# entries) of Interrupt Vector Table
+
+Return interrupt mode in D and size of interrupt vector table in E. For
+IM1, the size of the table is the number of vectors chained together.
+For IM2, the size of the table is the number of slots in the vector
+table.
+
+**SYSINT Subfunction 0x10) – Get Interrupt (INTGET)**
+
+     *Entry Parameters*  
+          B: 0xFC  
+          C: 0x10  
+          E: Interrupt Vector Table Index
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          HL: Current Interrupt Vector Address
+
+On entry, register E must contain an index into the interrupt vector
+table. On return, HL will contain the address of the current interrupt
+vector at the specified index.
+
+**SYSINT Subfunction 0x20) – Set Interrupt (INTSET)**
+
+     *Entry Parameters*  
+          B: 0xFC  
+          C: 0x20  
+          E: Interrupt Vector Table Index  
+          HL: Interrupt Address to be Assigned
+
+     *Returned Values*  
+          A: Status (0=OK, else error)  
+          HL: Previous Interrupt Vector Address  
+          DE: Interrupt Routing Engine Address (IM2)
+
+On entry, register E must contain an index into the interrupt vector
+table and register HL must contain the address of the new interrupt
+vector to be inserted in the table at the index. On return, HL will
+contain the previous address in the table at the index and register DE
+will contain the address of the interrupt routing engine required as
+specified above for IM2 interrupt handler stubs.
