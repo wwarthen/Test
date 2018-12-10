@@ -313,134 +313,6 @@ are required to be located in the upper 32K for CPU RAM address space.
 This requirement significantly simplifies the HBIOS proxy and improves
 performance by avoiding “double copies” of buffers.
 
-## Function Overview
-
-<table>
-<colgroup>
-<col style="width: 100%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;"><strong>Character Input/Output (CIO)</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">Character Input – CIOIN<br />
-Character Output – CIOOUT<br />
-Character Input Status – CIOIST<br />
-Character Output Status – CIOOST<br />
-Character I/O Initialization – CIOINIT<br />
-Character I/O Query – CIOQUERY<br />
-Character I/O Device – CIODEVICE</td>
-</tr>
-</tbody>
-</table>
-
-<table>
-<colgroup>
-<col style="width: 100%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;"><strong>Disk Input/Output (DIO)</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">Disk Status – DIOSTATUS<br />
-Disk Reset – DIORESET<br />
-Disk Seek – DIOSEEK<br />
-Disk Read – DIORD<br />
-Disk Write – DIOWR<br />
-Disk Verify – DIOVERIFY<br />
-Disk Format – DIOFORMAT<br />
-Disk Device – DIODEVICE<br />
-Disk Media – DIOMEDIA<br />
-Disk Define Media – DIODEFMED<br />
-Disk Capacity – DIOCAP<br />
-Disk Geometry – DIOGEOM</td>
-</tr>
-</tbody>
-</table>
-
-<table>
-<colgroup>
-<col style="width: 100%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;"><strong>Real Time Clock (RTC)</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">RTC Get Time – RTCGETTIM<br />
-RTC Set Time – RTCSETTIM<br />
-RTC Get NVRAM Byte – RTCGETBYT<br />
-RTC Set NVRAM Byte – RTCSETBYT<br />
-RTC Get NVRAM Block – RTCGETBLK<br />
-RTC Set NVRAM Block – RTCSETBLK</td>
-</tr>
-</tbody>
-</table>
-
-<table>
-<colgroup>
-<col style="width: 100%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;"><strong>Video Display Adapter (VDA)</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">VDA Initialize – VDAINI<br />
-VDA Query – VDAQRY<br />
-VDA Reset – VDARES<br />
-VDA Set Cursor Style – VDASCS<br />
-VDA Set Cursor Position – VDASCP<br />
-VDA Set Character Attribute – VDASAT<br />
-VDA Set Character Color – VDASCO<br />
-VDA Write Character – VDAWRC<br />
-VDA Fill – VDAFIL<br />
-VDA Copy – VDACPY<br />
-VDA Scroll – VDASCR<br />
-VDA Keyboard Status – VDAKST<br />
-VDA Keyboard Flush – VDAKFL<br />
-VDA Keyboard Read – VDAKRD</td>
-</tr>
-</tbody>
-</table>
-
-<table>
-<colgroup>
-<col style="width: 100%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;"><strong>System (SYS)</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">System Reset – SYSRESET<br />
-System Version – SYSVER<br />
-System Set Bank – SYSSETBNK<br />
-System Get Bank – SYSGETBNK System Set Copy – SYSSETCPY<br />
-System Bank Copy – SYSBNKCPY<br />
-System Alloc – SYSALLOC<br />
-System Free – SYSFREE<br />
-System Get – SYSGET<br />
-System Set – SYSSET<br />
-System Peek – SYSPEEK<br />
-System Poke – SYSPOKE<br />
-System Int – SYSINT</td>
-</tr>
-</tbody>
-</table>
-
 ## Character Input/Output (CIO)
 
 Character input/output functions require that a character unit be
@@ -450,80 +322,36 @@ uniquely. Each character device is handled by an appropriate driver
 (UART, ASCI, etc.) which is identified by a device type id from the
 table below.
 
-<table style="width:46%;">
-<colgroup>
-<col style="width: 12%" />
-<col style="width: 33%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;"><em>Id</em></th>
-<th style="text-align: left;"><em>Device Type / Driver</em></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">0x00<br />
-0x10<br />
-0x20<br />
-0x30<br />
-0x40<br />
-0x50<br />
-0x60<br />
-0xD0</td>
-<td style="text-align: left;">UART<br />
-ASCI<br />
-PropIO VGA<br />
-Terminal<br />
-ParPortProp VGA<br />
-SIO<br />
-ACIA<br />
-Console</td>
-</tr>
-</tbody>
-</table>
+| *Id* | *Device Type / Driver* |
+| ---- | ---------------------- |
+| 0x00 | UART                   |
+| 0x10 | ASCI                   |
+| 0x20 | PropIO VGA             |
+| 0x30 | Terminal               |
+| 0x40 | ParPortProp VGA        |
+| 0x50 | SIO                    |
+| 0x60 | ACIA                   |
+| 0xD0 | Console                |
 
 Character devices can usually be configured with line characteristics
 such as speed, framing, etc. A word value (16 bit) is used to describe
 the line characteristics as indicated below:
 
-<table style="width:58%;">
-<colgroup>
-<col style="width: 12%" />
-<col style="width: 45%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;"><em>Bits</em></th>
-<th style="text-align: left;"><em>Function</em></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">15-14<br />
-13<br />
-12-8<br />
-7<br />
-6<br />
-5-3<br />
-2<br />
-1-0</td>
-<td style="text-align: left;">Reserved (set to 0)<br />
-RTS<br />
-Baud Rate (see below)<br />
-DTR<br />
-XON/XOFF Flow Control<br />
-Parity (???)<br />
-Stop Bits (???)<br />
-Data Bits (???)</td>
-</tr>
-</tbody>
-</table>
+| *Bits* | *Function*            |
+| ------ | --------------------- |
+| 15-14  | Reserved (set to 0)   |
+| 13     | RTS                   |
+| 12-8   | Baud Rate (see below) |
+| 7      | DTR                   |
+| 6      | XON/XOFF Flow Control |
+| 5-3    | Parity (???)          |
+| 2      | Stop Bits (???)       |
+| 1-0    | Data Bits (???)       |
 
 The 5-bit baud rate value (V) is encoded as V = 75 \* 2^X \* 3^Y. The
 bits are defined as YXXXX.
 
-**Function 0x00 – Character Input (CIOIN)**
+### Function 0x00 – Character Input (CIOIN)
 
 *Entry Parameters*  
       B: 0x00  
@@ -537,7 +365,7 @@ Read a character from the device unit specified in register C and return
 the character value in E. If no character(s) are available, this
 function will wait indefinitely.
 
-**Function 0x01 – Character Output (CIOOUT)**
+### Function 0x01 – Character Output (CIOOUT)
 
 *Entry Parameters*  
       B: 0x01  
@@ -550,7 +378,7 @@ function will wait indefinitely.
 Send character value in register E to device specified in register C. If
 device is not ready to send, function will wait indefinitely.
 
-**Function 0x02 – Character Input Status (CIOIST)**
+### Function 0x02 – Character Input Status (CIOIST)
 
 *Entry Parameters*  
       B: 0x02  
@@ -564,7 +392,7 @@ the unit specified. If the device has no input buffer, it is acceptable
 to return simply 0 or 1 where 0 means there is no character available to
 read and 1 means there is at least one character available to read.
 
-**Function 0x03 – Character Output Status (CIOOST)**
+### Function 0x03 – Character Output Status (CIOOST)
 
 *Entry Parameters*  
       B: 0x03  
@@ -580,7 +408,7 @@ in the output buffer. If the port has no output buffer, it is acceptable
 to return simply 0 or 1 where 0 means the port is busy and 1 means the
 port is ready to output a character.
 
-**Function 0x04 – Character IO Initialization (CIOINIT)**
+### Function 0x04 – Character IO Initialization (CIOINIT)
 
 *Entry Parameters*  
       B: 0x04  
@@ -596,7 +424,7 @@ unit. Register pair DE specifies line characteristics. If DE contains -1
 characteristics used. Result of function is returned in A with zero
 indicating success.
 
-**Function 0x05 – Character IO Query (CIOQUERY)**
+### Function 0x05 – Character IO Query (CIOQUERY)
 
 *Entry Parameters*  
       B: 0x05  
@@ -610,7 +438,7 @@ Reports the line characteristics (baudrate, framing, etc.) of the
 specified unit. Register pair DE contains the line characteristics upon
 return.
 
-**Function 0x06 – Character IO Device (CIODEVICE)**
+### Function 0x06 – Character IO Device (CIODEVICE)
 
 *Entry Parameters*  
       B: 0x06  
@@ -636,7 +464,7 @@ uniquely. Each disk device is handled by an appropriate driver (IDE, SD,
 etc.) which is identified by a device type id from the table below.
 
 | **Type ID** | **Disk Device Type**         |
-| ----------- | :--------------------------- |
+| ----------- | ---------------------------- |
 | 0x00        | Memory Disk                  |
 | 0x10        | Floppy Disk                  |
 | 0x20        | RAM Floppy                   |
@@ -651,7 +479,7 @@ etc.) which is identified by a device type id from the table below.
 The currently defined media types are:
 
 | **Media ID** | **Value** | **Format**         |
-| :----------- | :-------- | :----------------- |
+| ------------ | --------- | ------------------ |
 | MID\_NONE    | 0         | No media installed |
 | MID\_MDROM   | 1         | ROM Drive          |
 | MID\_MDRAM   | 2         | RAM Drive          |
@@ -663,7 +491,7 @@ The currently defined media types are:
 | MID\_FD120   | 8         | 5.25" 1.2M Floppy  |
 | MID\_FD111   | 9         | 8" 1.11M Floppy    |
 
-**Function 0x10 – Disk Status (DIOSTATUS)**
+### Function 0x10 – Disk Status (DIOSTATUS)
 
 *Entry Parameters*  
       B: 0x10
@@ -671,7 +499,7 @@ The currently defined media types are:
 *Exit Results*  
       A: Status (0=OK, 1=Error)
 
-**Function 0x11 – Disk Status (DIORESET)**
+### Function 0x11 – Disk Status (DIORESET)
 
 *Entry Parameters*  
       B: 0x11  
@@ -685,7 +513,7 @@ all units associated with the interface for unit initialization at next
 I/O call. Clear media identified unless locked. Reset result code of all
 associated units of the physical interface.
 
-**Function 0x12 – Disk Seek (DIOSEEK)**
+### Function 0x12 – Disk Seek (DIOSEEK)
 
 *Entry Parameters*  
       B: 0x12  
@@ -717,13 +545,13 @@ Specifically, floppy disk devices must have CHS addresses. All other
 devices will accept either CHS or LBA. The DIOGEOM function can be used
 to determine if the device supports LBA addressing.
 
-**Function 0x13 – Disk Read (DIOREAD)**
+### Function 0x13 – Disk Read (DIOREAD)
 
 *Entry Parameters*  
       B: 0x13  
       C: Disk Device Unit ID  
-      HL: Buffer Address  
-      E: Block Count
+      E: Block Count  
+      HL: Buffer Address
 
 *Exit Results*  
       A: Status (0=OK, 1=Error)  
@@ -741,13 +569,13 @@ Caller must ensure: 1) buffer address is large enough to contain data
 for all sectors requested, and 2) entire buffer area resides in upper
 32K of memory.
 
-**Function 0x14 – Disk Seek (DIOWRITE)**
+### Function 0x14 – Disk Write (DIOWRITE)
 
 *Entry Parameters*  
       B: 0x14  
       C: Disk Device Unit ID  
-      HL: Buffer Address  
-      E: Block Count
+      E: Block Count  
+      HL: Buffer Address
 
 *Exit Results*  
       A: Status (0=OK, 1=Error)  
@@ -765,7 +593,7 @@ Caller must ensure: 1) buffer address is large enough to contain data
 for all sectors being written, and 2) entire buffer area resides in
 upper 32K of memory.
 
-**Function 0x15 – Disk Verify (DIOVERIFY)**
+### Function 0x15 – Disk Verify (DIOVERIFY)
 
 *Entry Parameters*  
       B: 0x15  
@@ -779,7 +607,7 @@ upper 32K of memory.
 
 \*\*\*Not Implemented\*\*\*
 
-**Function 0x16 – Disk Format (DIOFORMAT)**
+### Function 0x16 – Disk Format (DIOFORMAT)
 
 *Entry Parameters*  
       B: 0x16  
@@ -793,7 +621,7 @@ upper 32K of memory.
 
 \*\*\*Not Implemented\*\*\*
 
-**Function 0x17 – Disk DEVICE (DIODEVICE)**
+### Function 0x17 – Disk DEVICE (DIODEVICE)
 
 *Entry Parameters*  
       B: 0x17  
@@ -825,7 +653,7 @@ If Hard Disk:
                      4=ROM, 5=RAM, 6=RAMF, 7=Reserved)  
     Bits 2-0: Reserved
 
-**Function 0x18 – Disk Media (DIOMEDIA)**
+### Function 0x18 – Disk Media (DIOMEDIA)
 
 *Entry Parameters*  
       B: 0x18  
@@ -840,7 +668,7 @@ Report the media definition for media in specified unit. If bit 0 of E
 is set, then perform media discovery or verification. If no media in
 device, return no media error.
 
-**Function 0x19 – Disk Define Media (DIODEFMED)**
+### Function 0x19 – Disk Define Media (DIODEFMED)
 
 *Entry Parameters*  
       B: 0x19  
@@ -852,7 +680,7 @@ device, return no media error.
 
 \*\*\* Not implemented \*\*\*
 
-**Function 0x1A – Disk Media (DIOCAPACITY)**
+### Function 0x1A – Disk Media (DIOCAPACITY)
 
 *Entry Parameters*  
       B: 0x1A  
@@ -868,7 +696,7 @@ Report current media capacity information. DE:HL is a 32 bit number
 representing the total number of blocks on the device. BC contains the
 block size. If media is unknown, an error will be returned.
 
-**Function 0x1B – Disk Geometry (DIOGEOMETRY)**
+### Function 0x1B – Disk Geometry (DIOGEOMETRY)
 
 *Entry Parameters*  
       B: 0x1B  
@@ -892,7 +720,7 @@ The time functions (RTCGTM and RTCSTM) require a 6 byte date/time buffer
 of the following format. Each byte is BCD encoded.
 
 | **Offset** | **Contents**    |
-| :--------- | :-------------- |
+| ---------- | --------------- |
 | 0          | Year (00-99)    |
 | 1          | Month (01-12)   |
 | 2          | Date (01-31)    |
@@ -900,7 +728,7 @@ of the following format. Each byte is BCD encoded.
 | 4          | Minutes (00-59) |
 | 5          | Seconds (00-59) |
 
-**Function 0x20 – RTC Get Time (RTCGETTIM)**
+### Function 0x20 – RTC Get Time (RTCGETTIM)
 
 *Entry Parameters*  
       B: 0x20  
@@ -912,7 +740,7 @@ of the following format. Each byte is BCD encoded.
 Read the current value of the clock and store the date/time in the
 buffer pointed to by HL.
 
-**Function 0x21 – RTC Set Time (RTCSETTIM)**
+### Function 0x21 – RTC Set Time (RTCSETTIM)
 
 *Entry Parameters*  
       B: 0x21  
@@ -924,7 +752,7 @@ buffer pointed to by HL.
 Set the current value of the clock based on the date/time in the buffer
 pointed to by HL.
 
-**Function 0x22 – RTC Get NVRAM Byte (RTCGETBYT)**
+### Function 0x22 – RTC Get NVRAM Byte (RTCGETBYT)
 
 *Entry Parameters*  
       B: 0x22  
@@ -937,7 +765,7 @@ pointed to by HL.
 Read a single byte value from the Non-Volatile RAM at the index
 specified by C. The value is returned in register E.
 
-**Function 0x23 – RTC Set NVRAM Byte (RTCSETBYT)**
+### Function 0x23 – RTC Set NVRAM Byte (RTCSETBYT)
 
 *Entry Parameters*  
       B: 0x23  
@@ -950,7 +778,7 @@ specified by C. The value is returned in register E.
 Write a single byte value into the Non-Volatile RAM at the index
 specified by C. The value to be written is specified in E.
 
-**Function 0x24 – RTC Get NVRAM Block (RTCGETBLK)**
+### Function 0x24 – RTC Get NVRAM Block (RTCGETBLK)
 
 *Entry Parameters*  
       B: 0x24  
@@ -963,7 +791,7 @@ Read the entire contents of the Non-Volatile RAM into the buffer pointed
 to by HL. HL must point to a location in the top 32K of CPU address
 space.
 
-**Function 0x25 – RTC Set NVRAM Block (RTCSETBLK)**
+### Function 0x25 – RTC Set NVRAM Block (RTCSETBLK)
 
 *Entry Parameters*  
       B: 0x25  
@@ -989,7 +817,7 @@ lower nibble specifies the unit (not currently used).
 The currently defined video devices are:
 
 | VDA ID    | Value | Device                               |
-| :-------- | :---- | :----------------------------------- |
+| --------- | ----- | ------------------------------------ |
 | VDA\_NONE | 0     | No VDA                               |
 | VDA\_VDU  | 1     | ECB VDU board                        |
 | VDA\_CVDU | 2     | ECB Color VDU board                  |
@@ -1008,7 +836,7 @@ foreground and background. The following table illustrates the color
 byte value construction:
 
 |            | **Bit** | **Color** |
-| ---------- | :------ | :-------- |
+| ---------- | ------- | --------- |
 | Background | 7       | Intensity |
 |            | 6       | Blue      |
 |            | 5       | Green     |
@@ -1022,7 +850,7 @@ The following table illustrates the resultant color for each of the
 possible 16 values for foreground or background:
 
 | **Foreground**   | **Background**   | **Color**     |
-| :--------------- | :--------------- | :------------ |
+| ---------------- | ---------------- | ------------- |
 | \_0 \_\_\_\_0000 | 0\_ 0000\_\_\_\_ | Black         |
 | \_1 \_\_\_\_0001 | 1\_ 0001\_\_\_\_ | Red           |
 | \_2 \_\_\_\_0010 | 2\_ 0010\_\_\_\_ | Green         |
@@ -1043,7 +871,7 @@ possible 16 values for foreground or background:
 Attribute byte values are constructed using the following bit encoding:
 
 | **Bit** | **Effect** |
-| :------ | :--------- |
+| ------- | ---------- |
 | 7       | n/a (0)    |
 | 6       | n/a (0)    |
 | 5       | n/a (0)    |
@@ -1057,25 +885,25 @@ The following codes are returned by a keyboard read to signify non-ASCII
 keystrokes:
 
 | **Value** | **Keystroke** | **Value** | **Keystroke** |
-| :-------- | :------------ | :-------- | :------------ |
-| E0        | F1            | F0        | Insert        |
-| E1        | F2            | F1        | Delete        |
-| E2        | F3            | F2        | Home          |
-| E3        | F4            | F3        | End           |
-| E4        | F5            | F4        | PageUp        |
-| E5        | F6            | F5        | PadeDown      |
-| E6        | F7            | F6        | UpArrow       |
-| E7        | F8            | F7        | DownArrow     |
-| E8        | F9            | F8        | LeftArrow     |
-| E9        | F10           | F9        | RightArrow    |
-| EA        | F11           | FA        | Power         |
-| EB        | F12           | FB        | Sleep         |
-| EC        | SysReq        | FC        | Wake          |
-| ED        | PrintScreen   | FD        | Break         |
-| EE        | Pause         | FE        |               |
-| EF        | App           | FF        |               |
+| --------- | ------------- | --------- | ------------- |
+| 0xE0      | F1            | 0xF0      | Insert        |
+| 0xE1      | F2            | 0xF1      | Delete        |
+| 0xE2      | F3            | 0xF2      | Home          |
+| 0xE3      | F4            | 0xF3      | End           |
+| 0xE4      | F5            | 0xF4      | PageUp        |
+| 0xE5      | F6            | 0xF5      | PadeDown      |
+| 0xE6      | F7            | 0xF6      | UpArrow       |
+| 0xE7      | F8            | 0xF7      | DownArrow     |
+| 0xE8      | F9            | 0xF8      | LeftArrow     |
+| 0xE9      | F10           | 0xF9      | RightArrow    |
+| 0xEA      | F11           | 0xFA      | Power         |
+| 0xEB      | F12           | 0xFB      | Sleep         |
+| 0xEC      | SysReq        | 0xFC      | Wake          |
+| 0xED      | PrintScreen   | 0xFD      | Break         |
+| 0xEE      | Pause         | 0xFE      |               |
+| 0xEF      | App           | 0xFF      |               |
 
-**Function 0x40 – Video Initialize (VDAINI)**
+### Function 0x40 – Video Initialize (VDAINI)
 
 *Entry Parameters*  
       B: 0x40  
@@ -1098,7 +926,7 @@ of the CPU memory space. HL must be set to zero if no character bitmap
 is specified (the VDA video processor will utilize a default character
 bitmap).
 
-**Function 0x41 – Video Query (VDAQRY)**
+### Function 0x41 – Video Query (VDAQRY)
 
 *Entry Parameters*  
       B: 0x41  
@@ -1124,7 +952,7 @@ not point to a proper buffer area or memory corruption will result. The
 video device driver may not have the ability to provide character bitmap
 data. In this case, on return, HL will be set to zero.
 
-**Function 0x42 – Video Reset (VDARES)**
+### Function 0x42 – Video Reset (VDARES)
 
 *Entry Parameters*  
       B: 0x42  
@@ -1137,7 +965,7 @@ Performs a soft reset of the Video Display Adapter. Should clear the
 screen, home the cursor, restore active attribute and color to defaults.
 Keyboard should be flushed.
 
-**Function 0x43 – Video Set Cursor Style (VDASCS)**
+### Function 0x43 – Video Set Cursor Style (VDASCS)
 
 *Entry Parameters*  
       B: 0x43  
@@ -1160,7 +988,7 @@ visibility, etc.), but is not yet implemented.
 Adjustments to the cursor style may or may not be possible for any given
 video hardware.
 
-**Function 0x44 – Video Set Cursor Position (VDASCP)**
+### Function 0x44 – Video Set Cursor Position (VDASCP)
 
 *Entry Parameters*  
       B: 0x44  
@@ -1176,7 +1004,7 @@ row/column that exceeds the boundaries of the display results in
 undefined behavior. Cursor coordinates are 0 based (0,0 is the upper
 left corner of the display).
 
-**Function 0x45 – Video Set Character Attribute (VDASAT)**
+### Function 0x45 – Video Set Character Attribute (VDASAT)
 
 *Entry Parameters*  
       B: 0x45  
@@ -1192,7 +1020,7 @@ lines generated by scroll operations. Refer to the character attribute
 for a list of the available attribute codes. Note that a given video
 display may or may not support any/all attributes.
 
-**Function 0x46 – Video Set Character Color (VDASCO)**
+### Function 0x46 – Video Set Character Color (VDASCO)
 
 *Entry Parameters*  
       B: 0x46  
@@ -1208,7 +1036,7 @@ scroll operations. Refer to color code table for a list of the available
 color codes. Note that a given video display may or may not support
 any/all colors.
 
-**Function 0x47 – Video Set Write Character (VDAWRC)**
+### Function 0x47 – Video Set Write Character (VDAWRC)
 
 *Entry Parameters*  
       B: 0x47  
@@ -1224,7 +1052,7 @@ the line is encountered, the cursor will be advanced to the start of the
 next line. The display will **not** scroll if the end of the screen is
 exceeded.
 
-**Function 0x48 – Video Fill (VDAFIL)**
+### Function 0x48 – Video Fill (VDAFIL)
 
 *Entry Parameters*  
       B: 0x48  
@@ -1242,7 +1070,7 @@ If the end of the line is encountered, the characters will continue to
 be written starting at the next line as needed. The display will **not**
 scroll if the end of the screen is exceeded.
 
-**Function 0x49 – Video Copy (VDACPY)**
+### Function 0x49 – Video Copy (VDACPY)
 
 *Entry Parameters*  
       B: 0x49  
@@ -1261,7 +1089,7 @@ undefined behavior. The display will **not** scroll if the end of the
 screen is exceeded. Copying beyond the active screen buffer area is not
 supported and results in undefined behavior.
 
-**Function 0x4A – Video Scroll (VDASCR)**
+### Function 0x4A – Video Scroll (VDASCR)
 
 *Entry Parameters*  
       B: 0x4A  
@@ -1274,7 +1102,7 @@ supported and results in undefined behavior.
 Scroll the video display by the number of lines specified in E. If E
 contains a negative number, then reverse scroll should be performed.
 
-**Function 0x4B – Video Keyboard Status (VDAKST)**
+### Function 0x4B – Video Keyboard Status (VDAKST)
 
 *Entry Parameters*  
       B: 0x4B  
@@ -1288,7 +1116,7 @@ is not possible to determine the actual number in the buffer, it is
 acceptable to return 1 to indicate there are key codes available to read
 and 0 if there are none available.
 
-**Function 0x4C – Video Keyboard Flush (VDAKFL)**
+### Function 0x4C – Video Keyboard Flush (VDAKFL)
 
 *Entry Parameters*  
       B: 0x4C  
@@ -1300,7 +1128,7 @@ and 0 if there are none available.
 If a keyboard buffer is in use, it should be purged and all contents
 discarded.
 
-**Function 0x4D – Video Keyboard Read (VDAKRD)**
+### Function 0x4D – Video Keyboard Read (VDAKRD)
 
 *Entry Parameters*  
       B: 0x4D  
@@ -1324,7 +1152,7 @@ shift states as they existed at the time of the keystroke. The bitmap is
 defined as:
 
 | Bit | Keystate Indication              |
-| --- | :------------------------------- |
+| --- | -------------------------------- |
 | 7   | Key pressed was from the num pad |
 | 6   | Caps Lock was active             |
 | 5   | Num Lock was active              |
@@ -1340,7 +1168,7 @@ codes as described at the start of this section.
 
 ## System (SYS)
 
-**Function 0xF0 – System Reset (SYSRESET)**
+### Function 0xF0 – System Reset (SYSRESET)
 
 *Entry Parameters*  
       B: 0xF0
@@ -1351,7 +1179,7 @@ codes as described at the start of this section.
 Perform a soft reset of HBIOS. Releases all HBIOS memory allocated by
 current OS. Does not reinitialize physical devices.
 
-**Function 0xF1 – System Version (SYSVER)**
+### Function 0xF1 – System Version (SYSVER)
 
 *Entry Parameters*  
       B: 0xF1  
@@ -1370,7 +1198,7 @@ nibble of E is the build number.
 The hardware platform is identified in L:
 
 | Id | Platform       |
-| -- | :------------- |
+| -- | -------------- |
 | 1  | SBC V1 or V2   |
 | 2  | ZETA           |
 | 3  | ZETA 2         |
@@ -1380,7 +1208,7 @@ The hardware platform is identified in L:
 | 7  | RC2014 w/ Z80  |
 | 8  | RC2014 w/ Z180 |
 
-**Function 0xF2 – System Set Bank (SYSSETBNK)**
+### Function 0xF2 – System Set Bank (SYSSETBNK)
 
 *Entry Parameters*  
       B: 0xF2  
@@ -1394,7 +1222,7 @@ Activates the Bank ID specified in C and returns the previously active
 Bank ID in C. The caller MUST be invoked from code located in the upper
 32K and the stack **must** be in the upper 32K.
 
-**Function 0xF3 – System Get Bank (SYSGETBNK)**
+### Function 0xF3 – System Get Bank (SYSGETBNK)
 
 *Entry Parameters*  
       B: 0xF3
@@ -1405,7 +1233,7 @@ Bank ID in C. The caller MUST be invoked from code located in the upper
 
 Returns the currently active Bank ID in C.
 
-**Function 0xF4 – System Set Copy (SYSSETCPY)**
+### Function 0xF4 – System Set Copy (SYSSETCPY)
 
 *Entry Parameters*  
       B: 0xF4  
@@ -1428,7 +1256,7 @@ SYSSETCPY, you may make multiple calls to SYSBNKCPY as long as you want
 to continue to copy between the already established Source/Destination
 Banks and the same size copy if being performed.
 
-**Function 0xF5 – System Bank Copy (SYSBNKCPY)**
+### Function 0xF5 – System Bank Copy (SYSBNKCPY)
 
 *Entry Parameters*  
       B: 0xF5  
@@ -1454,7 +1282,7 @@ WARNINGS:
 
   - Copying of byte ranges that cross bank boundaries is undefined.
 
-**Function 0xF6 – System Alloc (SYSALLOC)**
+### Function 0xF6 – System Alloc (SYSALLOC)
 
 *Entry Parameters*  
       B: 0xF6  
@@ -1471,7 +1299,7 @@ successful, the address of the allocated memory block is returned in HL.
 You will typically want to use the SYSBNKCPY function to read/write the
 allocated memory.
 
-**Function 0xF7 – System Free (SYSFREE)**
+### Function 0xF7 – System Free (SYSFREE)
 
      *Entry Parameters*  
           B: 0xF7  
@@ -1482,7 +1310,7 @@ allocated memory.
 
 \*\*\* This function is not yet implemented \*\*\*
 
-**Function 0xF8 – System Get (SYSGET)**
+### Function 0xF8 – System Get (SYSGET)
 
      *Entry Parameters*  
           B: 0xF8  
@@ -1581,7 +1409,7 @@ with the registers/information returned.
           D: BIOS Bank ID  
           E: User Bank ID
 
-**Function 0xF9 – System Set (SYSSET)**
+### Function 0xF9 – System Set (SYSSET)
 
      *Entry Parameters*  
           B: 0xF9  
@@ -1594,7 +1422,7 @@ This function will set various system parameters based on the
 sub-function value. The following lists the subfunctions available along
 with the registers/information used as input.
 
-**SYSGET Subfunction 0xD0 – Set Timer Tick Count (TIMER)**
+**SYSSET Subfunction 0xD0 – Set Timer Tick Count (TIMER)**
 
      *Entry Parameters*  
           B: 0xF9  
@@ -1604,7 +1432,7 @@ with the registers/information used as input.
      *Returned Values*  
           A: Status (0=OK, else error)
 
-**SYSGET Subfunction 0xE0 – Set Boot Information (BOOTINFO)**
+**SYSSET Subfunction 0xE0 – Set Boot Information (BOOTINFO)**
 
      *Entry Parameters*  
           B: 0xF9  
@@ -1616,7 +1444,7 @@ with the registers/information used as input.
      *Returned Values*  
           A: Status (0=OK, else error)
 
-**Function 0xFA – System Peek (SYSPEEK)**
+### Function 0xFA – System Peek (SYSPEEK)
 
      *Entry Parameters*  
           B: 0xFA  
@@ -1630,7 +1458,7 @@ with the registers/information used as input.
 This function gets a single byte value at the specified bank/address.
 The bank specified is not range checked.
 
-**Function 0xFB – System Poke (SYSPOKE)**
+### Function 0xFB – System Poke (SYSPOKE)
 
      *Entry Parameters*  
           B: 0xFB  
@@ -1644,7 +1472,7 @@ The bank specified is not range checked.
 This function sets a single byte value at the specified bank/address.
 The bank specified is not range checked.
 
-**Function 0xFC – System Interrupt Management (SYSINT)**
+### Function 0xFC – System Interrupt Management (SYSINT)
 
      *Entry Parameters*  
           B: 0xFC  
@@ -1680,14 +1508,16 @@ For IM1:
 For IM2:
 
 > The interrupt handler requires an invocation stub separate from the
-> actual interrupt handling code. The stub must be:
-
-``` 
-        PUSH HL
-        LD HL,<adr of actual interrupt handler>
-        JP <adr of int routing engine>
-```
-
+> actual interrupt handling code. This stub must reside in the upper 32K
+> of RAM and consist of the following code. \<adr1\> is the address of
+> your new interrupt handler and this must also be in the upper 32K of
+> RAM. \<adr2\> must be the address of the HBIOS interrupt routing
+> routine. This address is provided to you by the INTSET function.  
+>   
+> `PUSH HL`  
+> `LD HL,<adr1>`  
+> `JP <adr2>`  
+>   
 > When calling Set Interrupt Vector, the address of the stub must be
 > provided for the Interrupt Vector parameter. The address of the
 > Interrupt Routing Engine will be returned in DE and must be inserted
