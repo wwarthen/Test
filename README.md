@@ -1,1590 +1,999 @@
-# Overview
-
-RomWBW provides a complete firmware package for all of the Z80 and Z180
-based systems that are available in the RetroBrew Computers Community
-(see
-[http://www.retrobrewcomputers.org](http://www.retrobrewcomputers.org/))
-as well as support for the RC2014 platform. Each of these systems
-provides for a fairly large ROM memory (typically, 512KB or more).
-RomWBW allows you to configure and build appropriate contents for such a
-ROM.
-
-Typically, a computer will contain a small ROM that contains the BIOS
-(Basic Input/Output System) functions as well as code to start the
-system by booting an operating system from a disk. Since the RetroBrew
-Computers Projects provide a large ROM space, RomWBW provides a much
-more comprehensive software package. In fact, it is entirely possible to
-run a fully functioning RetroBrew Computers System with nothing but the
-ROM.
-
-RomWBW firmware includes:
-
-  - System startup code (bootstrap)
-
-  - A basic system/debug monitor
-
-  - HBIOS (Hardware BIOS) providing support for the vast majority of
-    RetroBrew Computers I/O components
-
-  - A complete operating system (either CP/M 2.2 or ZSDOS 1.1)
-
-  - A built-in CP/M filesystem containing the basic applications and
-    utilities for the operating system and hardware being used
-
-It is appropriate to note that much of the code and components that make
-up a complete RomWBW package are derived from pre-existing work. Most
-notably, the imbedded operating system is simply a ROM-based copy of
-generic CP/M or ZSDOS. Much of the hardware support code was originally
-produced by other members of the RetroBrew Computers Community.
-
-The remainder of this document will focus on the HBIOS portion of the
-ROM. HBIOS contains the vast majority of the custom-developed code for
-the RetroBrew Computers hardware platforms. It provides a formal,
-structured interface that allows the operating system to be hosted with
-relative ease.
-
-# Background
-
-The Z80 CPU architecture has a limited, 64K address range. In general,
-this address space must accommodate a running application, disk
-operating system, and hardware support code.
-
-All RetroBrew Computers Z80 CPU platforms provide a physical address
-space that is much larger than the CPU address space (typically 512K or
-1MB physical RAM). This additional memory can be made available to the
-CPU using a technique called bank switching. To achieve this, the
-physical memory is divided up into chunks (banks) of 32K each. A
-designated area of the CPU’s 64K address space is then reserved to “map”
-any of the physical memory chunks. You can think of this as a window
-that can be adjusted to view portions of the physical memory in 32K
-blocks. In the case of RetroBrew Computers platforms, the lower 32K of
-the CPU address space is used for this purpose (the window). The upper
-32K of CPU address space is assigned a fixed 32K area of physical memory
-that never changes. The lower 32K can be “mapped” on the fly to any of
-the 32K banks of physical memory at a time. The only constraint is that
-the CPU cannot be executing code in the lower 32K of CPU address space
-at the time that a bank switch is performed.
-
-By cleverly utilizing the pages of physical RAM for specific purposes
-and swapping in the correct page when needed, it is possible to utilize
-substantially more than 64K of RAM. Because the RetroBrew Computers
-Project has now produced a very large variety of hardware, it has become
-extremely important to implement a bank switched solution to accommodate
-the maximum range of hardware devices and desired functionality.
-
-# General Design Strategy
-
-The design goal is to locate as much of the hardware dependent code as
-possible out of normal 64KB CP/M address space and into a bank switched
-area of memory. A very small code shim (proxy) is located in the top 512
-bytes of CPU memory. This proxy is responsible for redirecting all
-hardware BIOS (HBIOS) calls by swapping the “driver code” bank of
-physical RAM into the lower 32K and completing the request. The
-operating system is unaware this has occurred. As control is returned to
-the operating system, the lower 32KB of memory is switched back to the
-original memory bank.
-
-HBIOS is completely agnostic with respect to the operating system (it
-does not know or care what operating system is using it). The operating
-system makes simple calls to HBIOS to access any desired hardware
-functions. Since the HBIOS proxy occupies only 512 bytes at the top of
-memory, the vast majority of the CPU memory is available to the
-operating system and the running application. As far as the operating
-system is concerned, all of the hardware driver code has been magically
-implemented inside of a small 512 byte area at the top of the CPU
-address space.
-
-Unlike some other Z80 bank switching schemes, there is no attempt to
-build bank switching into the operating system itself. This is
-intentional so as to ensure that any operating system can easily be
-adapted without requiring invasive modifications to the operating system
-itself. This also keeps the complexity of memory management completely
-away from the operating system and applications.
-
-There are some operating systems that have built-in support for bank
-switching (e.g., CP/M 3). These operating systems are allowed to make
-use of the bank switched memory and are compatible with HBIOS. However,
-it is necessary that the customization of these operating systems take
-into account the banks of memory used by HBIOS and not attempt to use
-those specific banks.
-
-Note that all code and data are located in RAM memory during normal
-execution. While it is possible to use ROM memory to run code, it would
-require that more upper memory be reserved for data storage. It is
-simpler and more memory efficient to keep everything in RAM. At startup
-(boot) all required code is copied to RAM for subsequent execution.
-
-# Runtime Memory Layout
-
-![Banked Switched Memory Layout](Bank%20Switched%20Memory.png)
-
-# System Boot Process
-
-A multi-phase boot strategy is employed. This is necessary because at
-cold start, the CPU is executing code from ROM in lower memory which is
-the same area that is bank switched.
-
-Boot Phase 1 copies the phase 2 code to upper memory and jumps to it to
-continue the boot process. This is required because the CPU starts at
-address $0000 in low memory. However, low memory is used as the area for
-switching ROM/RAM banks in and out. Therefore, it is necessary to
-relocate execution to high memory in order to initialize the RAM memory
-banks.
-
-Boot Phase 2 manages the setup of the RAM page banks for HBIOS
-operation, performs hardware initialization, and then executes the boot
-loader.
-
-Boot Phase 3 is the loading of the selecting operating system (or debug
-monitor) by the Boot Loader. The Boot Loader is responsible for
-prompting the user to select a target operating system to load, loading
-it into RAM, then transferring control to it. The Boot Loader is capable
-of loading a target operating system from a variety of locations
-including disk drives and ROM.
-
-Note that the entire boot process is entirely operating system agnostic.
-It is unaware of the operating system being loaded. The Boot Loader
-prompts the user for the location of the binary image to load, but does
-not know anything about what is being loaded (the image is usually an
-operating system, but could be any executable code image). Once the Boot
-Loader has loaded the image at the selected location, it will transfer
-control to it. Assuming the typical situation where the image was an
-operating system, the loaded operating system will then perform it’s own
-initialization and begin normal operation.
-
-There are actually two ways to perform a system boot. The first, and
-most commonly used, method is a “ROM Boot”. This refers to booting the
-system directly from the startup code contained on the physical ROM
-chip. A ROM Boot is always performed upon power up or when a hardware
-reset is performed.
-
-Once the system is running (operating system loaded), it is possible to
-reboot the system from a system image contained on the file system. This
-is referred to as an “Application Boot”. This mechanism allows a
-temporary copy of the system to be uploaded and stored on the file
-system of an already running system and then used to boot the system.
-This boot technique is useful to: 1) test a new build of a system image
-before programming it to the ROM; or 2) easily switch between system
-images on the fly.
-
-A more detailed explanation of these two boot processes is presented
-below.
-
-## ROM Boot
-
-At power on (or hardware reset), ROM page 0 is automatically mapped to
-lower memory by hardware level system initialization. Page Zero (first
-256 bytes of the CPU address space) is reserved to contain dispatching
-instructions for interrupt instructions. Address $0000 performs a jump
-to the start of the phase 1 code so that this first page can be
-reserved.
-
-The phase 1 code now copies the phase 2 code from lower memory to upper
-memory and jumps to it. The phase 2 code now initializes the HBIOS by
-copying the ROM resident HBIOS from ROM to RAM. It subsequently calls
-the HBIOS initialization routine. Finally, it starts the Boot Loader
-which prompts the user for the location of the target system image to
-execute.
-
-Once the boot loader transfers control to the target system image, all
-of the Phase 1, Phase 2, and Boot Loader code is abandoned and the space
-it occupied is normally overwritten by the operating system.
-
-## Application Boot
-
-When a new system image is built, one of the output files produced is an
-actual CP/M application (an executable .COM program file). Once you have
-a running CP/M (or compatible) system, you can upload/copy this
-application file to the filesystem. By executing this file, you will
-initiate an Application Boot using the system image contained in the
-application file itself.
-
-Upon execution, the Application Boot program is loaded into memory by
-the previously running operating system starting at $0100. Note that
-program image contains a copy of the HBIOS to be installed and run. Once
-the Application Boot program is loaded by the previous operating system,
-control is passed to it and it performs a system initialization similar
-to the ROM Boot, but using the image loaded in RAM.
-
-Specifically, the code at $0100 (in low memory) copies phase 2 boot code
-to upper memory and transfers control to it. The phase 2 boot code
-copies the HBIOS image from application RAM to RAM, then calls the HBIOS
-initialization routine. At this point, the prior HBIOS code has been
-discarded and overwritten. Finally, the Boot Loader is invoked just like
-a ROM Boot.
-
-## Notes
-
-1.  Size of ROM disk and RAM disk will be decreased as needed to
-    accommodate RAM and ROM memory bank usage for the banked BIOS.
-
-2.  There is no support for interrupt driven drivers at this time. Such
-    support should be possible in a variety of ways, but none are yet
-    implemented.
-
-# Driver Model
-
-The framework code for bank switching also allows hardware drivers to be
-implemented mostly without concern for memory management. Drivers are
-coded to simply implement the HBIOS functions appropriate for the type
-of hardware being supported. When the driver code gets control, it has
-already been mapped to the CPU address space and simply performs the
-requested function based on parameters passed in registers. Upon return,
-the bank switching framework takes care of restoring the original memory
-layout expected by the operating system and application.
-
-However, the one constraint of hardware drivers is that any data buffers
-that are to be returned to the operating system or applications must be
-allocated in high memory. Buffers inside of the driver’s memory bank
-will be swapped out of the CPU address space when control is returned to
-the operating system.
-
-If the driver code must make calls to other code, drivers, or utilities
-in the driver bank, it must make those calls directly (it must not use
-RST 08). This is to avoid a nested bank switch which is not supported at
-this time.
-
-# Character / Emulation / Video Services
-
-In addition to a generic set of routines to handle typical character
-input/output, HBIOS also includes functionality for managing built-in
-video display adapters. To start with there is a basic set of character
-input/output functions, the CIOXXX functions, which allow for simple
-character data streams. These functions fully encompass routing byte
-stream data to/from serial ports. Note that there is a special character
-pseudo-device called “CRT”. When characters are read/written to/from the
-CRT character device, the data is actually passed to a built-in terminal
-emulator which, in turn, utilizes a set of VDA (Video Display Adapter)
-functions (such as cursor positioning, scrolling, etc.).
-
-The following diagram depicts the relationship between these components
-of HBIOS video processing:
-
-![Character / Emulation / Video
-Services](Character%20Emulation%20Video%20Services.png)
-
-Normally, the operating system will simply utilize the CIOXXX functions
-to send and receive character data. The Character I/O Services will
-route I/O requests to the specified physical device which is most
-frequently a serial port (such as UART or ASCI). As shown above, if the
-CRT device is targeted by a CIOXXX function, it will actually be routed
-to the Emulation Services which implement TTY, ANSI, etc. escape
-sequences. The Emulation Services subsequently rely on the Video Display
-Adapter Services as an additional layer of abstraction. This allows the
-emulation code to be completely unaware of the actual physical device
-(device independent). Video Display Adapter (VDA) Services contains
-drivers as needed to handle the available physical video adapters.
-
-Note that the Emulation and VDA Services API functions are available to
-be called directly. Doing so must be done carefully so as to not corrupt
-the “state” of the emulation logic.
-
-Before invoking CIOXXX functions targeting the CRT device, it is
-necessary that the underlying layers (Emulation and VDA) be properly
-initialized. The Emulation Services must be initialized to specify the
-desired emulation and specific physical VDA device to target. Likewise,
-the VDA Services may need to be initialized to put the specific video
-hardware into the proper mode, etc.
-
-# HBIOS Reference
-
-## Invocation
-
-HBIOS functions are invoked by placing the required parameters in CPU
-registers and executing an RST 08 instruction. Note that HBIOS does not
-preserve register values that are unused. However, it must not modify
-the Z80 alternate registers or IX/IY (these registers can be used within
-HBIOS as long as they are saved and restored internally).
-
-Normally, applications will not call HBIOS functions directly. It is
-intended that the operating system makes all HBIOS function calls.
-Applications that are considered system utilities may use HBIOS, but
-must be careful not to modify the operating environment in any way that
-the operating system does not expect.
-
-In general, the desired function is placed in the B register. Register C
-is frequently used to specify a subfunction or a target device number.
-Additional registers are used as defined by the specific function.
-Register A should be used to return function result information. A=0
-should indicate success, other values are function specific.
-
-Some functions utilize pointers to memory buffers. Such memory buffers
-are required to be located in the upper 32K for CPU RAM address space.
-This requirement significantly simplifies the HBIOS proxy and improves
-performance by avoiding “double copies” of buffers.
-
-## Character Input/Output (CIO)
-
-Character input/output functions require that a character unit be
-specified in the C register. This is the logical device number assigned
-during the boot process that identifies all character i/o devices
-uniquely. Each character device is handled by an appropriate driver
-(UART, ASCI, etc.) which is identified by a device type id from the
-table below.
-
-| *Id* | *Device Type / Driver* |
-| ---- | ---------------------- |
-| 0x00 | UART                   |
-| 0x10 | ASCI                   |
-| 0x20 | PropIO VGA             |
-| 0x30 | Terminal               |
-| 0x40 | ParPortProp VGA        |
-| 0x50 | SIO                    |
-| 0x60 | ACIA                   |
-| 0xD0 | Console                |
-
-Character devices can usually be configured with line characteristics
-such as speed, framing, etc. A word value (16 bit) is used to describe
-the line characteristics as indicated below:
-
-| *Bits* | *Function*            |
-| ------ | --------------------- |
-| 15-14  | Reserved (set to 0)   |
-| 13     | RTS                   |
-| 12-8   | Baud Rate (see below) |
-| 7      | DTR                   |
-| 6      | XON/XOFF Flow Control |
-| 5-3    | Parity (???)          |
-| 2      | Stop Bits (???)       |
-| 1-0    | Data Bits (???)       |
-
-The 5-bit baud rate value (V) is encoded as V = 75 \* 2^X \* 3^Y. The
-bits are defined as YXXXX.
-
-### Function 0x00 – Character Input (CIOIN)
-
-*Entry Parameters*  
-      B: 0x00  
-      C: Serial Device Unit Number
-
-*Exit Results*  
-      A: Status  
-      E: Character Received
-
-Read a character from the device unit specified in register C and return
-the character value in E. If no character(s) are available, this
-function will wait indefinitely.
-
-### Function 0x01 – Character Output (CIOOUT)
-
-*Entry Parameters*  
-      B: 0x01  
-      C: Serial Device Unit Number  
-      E: Character to Send
-
-*Exit Results*  
-      A: Status
-
-Send character value in register E to device specified in register C. If
-device is not ready to send, function will wait indefinitely.
-
-### Function 0x02 – Character Input Status (CIOIST)
-
-*Entry Parameters*  
-      B: 0x02  
-      C: Serial Device Unit Number
-
-*Exit Results*  
-      A: Status
-
-Return the number of characters available to read in the input buffer of
-the unit specified. If the device has no input buffer, it is acceptable
-to return simply 0 or 1 where 0 means there is no character available to
-read and 1 means there is at least one character available to read.
-
-### Function 0x03 – Character Output Status (CIOOST)
-
-*Entry Parameters*  
-      B: 0x03  
-      C: Serial Device Unit Number
-
-*Exit Results*  
-      A: Status
-
-Return the space available in the output buffer expressed as a character
-count. If a 16 byte output buffer contained 6 characters waiting to be
-sent, this function would return 10, the number of positions available
-in the output buffer. If the port has no output buffer, it is acceptable
-to return simply 0 or 1 where 0 means the port is busy and 1 means the
-port is ready to output a character.
-
-### Function 0x04 – Character IO Initialization (CIOINIT)
-
-*Entry Parameters*  
-      B: 0x04  
-      C: Serial Device Unit Number  
-      DE: Line Characteristics
-
-*Exit Results*  
-      A: Status
-
-Setup line characteristics (baudrate, framing, etc.) of the specified
-unit. Register pair DE specifies line characteristics. If DE contains -1
-(0xFFFF), then the device will be reinitialized with the last line
-characteristics used. Result of function is returned in A with zero
-indicating success.
-
-### Function 0x05 – Character IO Query (CIOQUERY)
-
-*Entry Parameters*  
-      B: 0x05  
-      C: Serial Device Unit Number
-
-*Exit Results*  
-      A: Status  
-      DE: Line Characteristics
-
-Reports the line characteristics (baudrate, framing, etc.) of the
-specified unit. Register pair DE contains the line characteristics upon
-return.
-
-### Function 0x06 – Character IO Device (CIODEVICE)
-
-*Entry Parameters*  
-      B: 0x06  
-      C: Serial Device Unit Number
-
-*Exit Results*  
-      A: Status  
-      C: Serial Device Attributes  
-      D: Serial Device Type  
-      E: Serial Device Number
-
-Reports information about the character device unit specified. Register
-C indicates the device attributes: 0=RS-232 and 1=Terminal. Register D
-indicates the device type (driver) and register E indicates the physical
-device number assigned by the driver.
-
-## Disk Input/Output (DIO)
-
-Character input/output functions require that a character unit be
-specified in the C register. This is the logical disk unit number
-assigned during the boot process that identifies all disk i/o devices
-uniquely. Each disk device is handled by an appropriate driver (IDE, SD,
-etc.) which is identified by a device type id from the table below.
-
-| **Type ID** | **Disk Device Type**         |
-| ----------- | ---------------------------- |
-| 0x00        | Memory Disk                  |
-| 0x10        | Floppy Disk                  |
-| 0x20        | RAM Floppy                   |
-| 0x30        | IDE Disk                     |
-| 0x40        | ATAPI Disk (not implemented) |
-| 0x50        | PPIDE Disk                   |
-| 0x60        | SD Card                      |
-| 0x70        | PropIO SD Card               |
-| 0x80        | ParPortProp SD Card          |
-| 0x90        | SIMH HDSK Disk               |
-
-The currently defined media types are:
-
-| **Media ID** | **Value** | **Format**         |
-| ------------ | --------- | ------------------ |
-| MID\_NONE    | 0         | No media installed |
-| MID\_MDROM   | 1         | ROM Drive          |
-| MID\_MDRAM   | 2         | RAM Drive          |
-| MID\_RF      | 3         | RAM Floppy (LBA)   |
-| MID\_HD      | 4         | Hard Disk (LBA)    |
-| MID\_FD720   | 5         | 3.5" 720K Floppy   |
-| MID\_FD144   | 6         | 3.5" 1.44M Floppy  |
-| MID\_FD360   | 7         | 5.25" 360K Floppy  |
-| MID\_FD120   | 8         | 5.25" 1.2M Floppy  |
-| MID\_FD111   | 9         | 8" 1.11M Floppy    |
-
-### Function 0x10 – Disk Status (DIOSTATUS)
-
-*Entry Parameters*  
-      B: 0x10
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)
-
-### Function 0x11 – Disk Status (DIORESET)
-
-*Entry Parameters*  
-      B: 0x11  
-      C: Disk Device Unit ID
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)
-
-Reset the physical interface associated with the specified unit. Flag
-all units associated with the interface for unit initialization at next
-I/O call. Clear media identified unless locked. Reset result code of all
-associated units of the physical interface.
-
-### Function 0x12 – Disk Seek (DIOSEEK)
-
-*Entry Parameters*  
-      B: 0x12  
-      C: Disk Device Unit ID  
-      D7: Address Type (0=CHS, 1=LBA)
-
-      if CHS:  
-          D6-0: Head  
-          E: Sector  
-          HL: Track
-
-      if LBA:  
-          DE:HL: Block Address
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)
-
-Update target CHS or LBA for next I/O request on designated unit.
-Physical seek is typically deferred until subsequent I/O operation.
-
-Bit 7 of D indicates whether the disk seek address is specified as
-cylinder/head/sector (CHS) or Logical Block Address (LBA). If D:7=1,
-then the remaining bits of of the 32 bit register set DE:HL specify a
-linear, zero offset, block number. If D:7=0, then the remaining bits of
-D specify the head, E specifies sector, and HL specifies track.
-
-Note that not all devices will accept both types of addresses.
-Specifically, floppy disk devices must have CHS addresses. All other
-devices will accept either CHS or LBA. The DIOGEOM function can be used
-to determine if the device supports LBA addressing.
-
-### Function 0x13 – Disk Read (DIOREAD)
-
-*Entry Parameters*  
-      B: 0x13  
-      C: Disk Device Unit ID  
-      E: Block Count  
-      HL: Buffer Address
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)  
-      E: Blocks Reaad
-
-Read Block Count sectors to buffer address starting at current target
-sector. Current sector must be established by prior seek function;
-however, multiple read/write/verify function calls can be made after a
-seek function. Current sector is incremented after each sector
-successfully read. On error, current sector is sector is sector where
-error occurred. Blocks read indicates number of sectors successfully
-read.
-
-Caller must ensure: 1) buffer address is large enough to contain data
-for all sectors requested, and 2) entire buffer area resides in upper
-32K of memory.
-
-### Function 0x14 – Disk Write (DIOWRITE)
-
-*Entry Parameters*  
-      B: 0x14  
-      C: Disk Device Unit ID  
-      E: Block Count  
-      HL: Buffer Address
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)  
-      E: Blocks Written
-
-Write Block Count sectors to buffer address starting at current target
-sector. Current sector must be established by prior seek function;
-however, multiple read/write/verify function calls can be made after a
-seek function. Current sector is incremented after each sector
-successfully written. On error, current sector is sector is sector where
-error occurred. Blocks written indicates number of sectors successfully
-written.
-
-Caller must ensure: 1) buffer address is large enough to contain data
-for all sectors being written, and 2) entire buffer area resides in
-upper 32K of memory.
-
-### Function 0x15 – Disk Verify (DIOVERIFY)
-
-*Entry Parameters*  
-      B: 0x15  
-      C: Disk Device Unit ID  
-      HL: Buffer Address  
-      E: Block Count
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)  
-      E: Blocks Verified
-
-\*\*\*Not Implemented\*\*\*
-
-### Function 0x16 – Disk Format (DIOFORMAT)
-
-*Entry Parameters*  
-      B: 0x16  
-      C: Disk Device Unit ID  
-      D: Head  
-      E: Fill Byte  
-      HL: Cylinder
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)
-
-\*\*\*Not Implemented\*\*\*
-
-### Function 0x17 – Disk DEVICE (DIODEVICE)
-
-*Entry Parameters*  
-      B: 0x17  
-      C: Disk Device Unit ID
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)  
-      C: Attributes  
-      D: Device Type  
-      E: Device Number
-
-Reports information about the character device unit specified. Register
-D indicates the device type (driver) and register E indicates the
-physical device number assigned by the driver.
-
-Register C reports the following device attributes:
-
-Bit 7: 1=Floppy, 0=Hard Disk (or similar, e.g. CF, SD, RAM)
-
-If Floppy:  
-    Bits 6-5: Form Factor (0=8“, 1=5.25”, 2=3.5", 3=Other)  
-    Bit 4: Sides (0=SS, 1=DS)  
-    Bits 3-2: Density (0=SD, 1=DD, 2=HD, 3=ED)  
-    Bits 1-0: Reserved
-
-If Hard Disk:  
-    Bit 6: Removable\\  
-    Bits: 5-3: Type (0=Hard, 1=CF, 2=SD, 3=USB,  
-                     4=ROM, 5=RAM, 6=RAMF, 7=Reserved)  
-    Bits 2-0: Reserved
-
-### Function 0x18 – Disk Media (DIOMEDIA)
-
-*Entry Parameters*  
-      B: 0x18  
-      C: Disk Device Unit ID  
-      E0: Enable Media Discovery
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)  
-      E: Media ID
-
-Report the media definition for media in specified unit. If bit 0 of E
-is set, then perform media discovery or verification. If no media in
-device, return no media error.
-
-### Function 0x19 – Disk Define Media (DIODEFMED)
-
-*Entry Parameters*  
-      B: 0x19  
-      C: Disk Device Unit ID  
-      E: Media ID
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)
-
-\*\*\* Not implemented \*\*\*
-
-### Function 0x1A – Disk Media (DIOCAPACITY)
-
-*Entry Parameters*  
-      B: 0x1A  
-      C: Disk Device Unit ID  
-      HL: Buffer Address
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)  
-      DE:HL: Blocks on Device  
-      BC: Block Size
-
-Report current media capacity information. DE:HL is a 32 bit number
-representing the total number of blocks on the device. BC contains the
-block size. If media is unknown, an error will be returned.
-
-### Function 0x1B – Disk Geometry (DIOGEOMETRY)
-
-*Entry Parameters*  
-      B: 0x1B  
-      C: Disk Device Unit ID
-
-*Exit Results*  
-      A: Status (0=OK, 1=Error)  
-      HL: Cylinders  
-      D7: LBA Capability  
-      BC: Block Size
-
-Report current media geometry information. If media is unknown, return
-error (no media).
-
-## Real Time Clock (RTC)
-
-The Real Time Clock functions provide read/write access to the clock and
-related Non-Volatile RAM.
-
-The time functions (RTCGTM and RTCSTM) require a 6 byte date/time buffer
-of the following format. Each byte is BCD encoded.
-
-| **Offset** | **Contents**    |
-| ---------- | --------------- |
-| 0          | Year (00-99)    |
-| 1          | Month (01-12)   |
-| 2          | Date (01-31)    |
-| 3          | Hours (00-24)   |
-| 4          | Minutes (00-59) |
-| 5          | Seconds (00-59) |
-
-### Function 0x20 – RTC Get Time (RTCGETTIM)
-
-*Entry Parameters*  
-      B: 0x20  
-      HL: Time Buffer Address
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Read the current value of the clock and store the date/time in the
-buffer pointed to by HL.
-
-### Function 0x21 – RTC Set Time (RTCSETTIM)
-
-*Entry Parameters*  
-      B: 0x21  
-      HL: Time Buffer Address
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Set the current value of the clock based on the date/time in the buffer
-pointed to by HL.
-
-### Function 0x22 – RTC Get NVRAM Byte (RTCGETBYT)
-
-*Entry Parameters*  
-      B: 0x22  
-      C: Index
-
-*Exit Results*  
-      A: Status (0=OK, else error)  
-      E: Value
-
-Read a single byte value from the Non-Volatile RAM at the index
-specified by C. The value is returned in register E.
-
-### Function 0x23 – RTC Set NVRAM Byte (RTCSETBYT)
-
-*Entry Parameters*  
-      B: 0x23  
-      C: Index
-
-*Exit Results*  
-      A: Status (0=OK, else error)  
-      E: Value
-
-Write a single byte value into the Non-Volatile RAM at the index
-specified by C. The value to be written is specified in E.
-
-### Function 0x24 – RTC Get NVRAM Block (RTCGETBLK)
-
-*Entry Parameters*  
-      B: 0x24  
-      HL: Buffer
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Read the entire contents of the Non-Volatile RAM into the buffer pointed
-to by HL. HL must point to a location in the top 32K of CPU address
-space.
-
-### Function 0x25 – RTC Set NVRAM Block (RTCSETBLK)
-
-*Entry Parameters*  
-      B: 0x25  
-      HL: Buffer
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Write the entire contents of the Non-Volatile RAM from the buffer
-pointed to by HL. HL must point to a location in the top 32K of CPU
-address space.
-
-## Video Display Adapter (VDA)
-
-The VDA functions are provided as a common interface to Video Display
-Adapters. Not all VDAs will include keyboard hardware. In this case, the
-keyboard functions should return a failure status.
-
-The VDA functions require that a VDA device/unit be specified in the C
-register. The upper nibble (upper 4 bits) specifies the device. The
-lower nibble specifies the unit (not currently used).
-
-The currently defined video devices are:
-
-| VDA ID    | Value | Device                               |
-| --------- | ----- | ------------------------------------ |
-| VDA\_NONE | 0     | No VDA                               |
-| VDA\_VDU  | 1     | ECB VDU board                        |
-| VDA\_CVDU | 2     | ECB Color VDU board                  |
-| VDA\_7220 | 3     | ECB uPD7220 video display board      |
-| VDA\_N8   | 4     | TMS9918 video display built-in to N8 |
-
-Depending on the capabilities of the hardware, the use of colors and
-attributes may or may not be supported. If the hardware does not support
-these capabilities, they will be ignored.
-
-Color byte values are constructed using typical RGBI
-(Red/Green/Blue/Intensity) bits. The high four bits of the value
-determine the background color and the low four bits determine the
-foreground color. This results in 16 unique color values for both
-foreground and background. The following table illustrates the color
-byte value construction:
-
-|            | **Bit** | **Color** |
-| ---------- | ------- | --------- |
-| Background | 7       | Intensity |
-|            | 6       | Blue      |
-|            | 5       | Green     |
-|            | 4       | Red       |
-| Foreground | 3       | Intensity |
-|            | 2       | Blue      |
-|            | 1       | Green     |
-|            | 0       | Red       |
-
-The following table illustrates the resultant color for each of the
-possible 16 values for foreground or background:
-
-| **Foreground**   | **Background**   | **Color**     |
-| ---------------- | ---------------- | ------------- |
-| \_0 \_\_\_\_0000 | 0\_ 0000\_\_\_\_ | Black         |
-| \_1 \_\_\_\_0001 | 1\_ 0001\_\_\_\_ | Red           |
-| \_2 \_\_\_\_0010 | 2\_ 0010\_\_\_\_ | Green         |
-| \_3 \_\_\_\_0011 | 3\_ 0011\_\_\_\_ | Brown         |
-| \_4 \_\_\_\_0100 | 4\_ 0100\_\_\_\_ | Blue          |
-| \_5 \_\_\_\_0101 | 5\_ 0101\_\_\_\_ | Magenta       |
-| \_6 \_\_\_\_0110 | 6\_ 0110\_\_\_\_ | Cyan          |
-| \_7 \_\_\_\_0111 | 7\_ 0111\_\_\_\_ | White         |
-| \_8 \_\_\_\_1000 | 8\_ 1000\_\_\_\_ | Gray          |
-| \_9 \_\_\_\_1001 | 9\_ 1001\_\_\_\_ | Light Red     |
-| \_A \_\_\_\_1010 | A\_ 1010\_\_\_\_ | Light Green   |
-| \_B \_\_\_\_1011 | B\_ 1011\_\_\_\_ | Yellow        |
-| \_C \_\_\_\_1100 | C\_ 1100\_\_\_\_ | Light Blue    |
-| \_D \_\_\_\_1101 | D\_ 1101\_\_\_\_ | Light Magenta |
-| \_E \_\_\_\_1110 | E\_ 1110\_\_\_\_ | Light Cyan    |
-| \_F \_\_\_\_1111 | F\_ 1111\_\_\_\_ | Bright White  |
-
-Attribute byte values are constructed using the following bit encoding:
-
-| **Bit** | **Effect** |
-| ------- | ---------- |
-| 7       | n/a (0)    |
-| 6       | n/a (0)    |
-| 5       | n/a (0)    |
-| 4       | n/a (0)    |
-| 3       | n/a (0)    |
-| 2       | Reverse    |
-| 1       | Underline  |
-| 0       | Blink      |
-
-The following codes are returned by a keyboard read to signify non-ASCII
-keystrokes:
-
-| **Value** | **Keystroke** | **Value** | **Keystroke** |
-| --------- | ------------- | --------- | ------------- |
-| 0xE0      | F1            | 0xF0      | Insert        |
-| 0xE1      | F2            | 0xF1      | Delete        |
-| 0xE2      | F3            | 0xF2      | Home          |
-| 0xE3      | F4            | 0xF3      | End           |
-| 0xE4      | F5            | 0xF4      | PageUp        |
-| 0xE5      | F6            | 0xF5      | PadeDown      |
-| 0xE6      | F7            | 0xF6      | UpArrow       |
-| 0xE7      | F8            | 0xF7      | DownArrow     |
-| 0xE8      | F9            | 0xF8      | LeftArrow     |
-| 0xE9      | F10           | 0xF9      | RightArrow    |
-| 0xEA      | F11           | 0xFA      | Power         |
-| 0xEB      | F12           | 0xFB      | Sleep         |
-| 0xEC      | SysReq        | 0xFC      | Wake          |
-| 0xED      | PrintScreen   | 0xFD      | Break         |
-| 0xEE      | Pause         | 0xFE      |               |
-| 0xEF      | App           | 0xFF      |               |
-
-### Function 0x40 – Video Initialize (VDAINI)
-
-*Entry Parameters*  
-      B: 0x40  
-      C: Video Device Unit ID  
-      E: Video Mode (device specific)  
-      HL: Font Bitmap Buffer Address (optional)
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Performs a full (re)initialization of the specified video device. The
-screen is cleared and the keyboard buffer is flushed. If the specified
-VDA supports multiple video modes, the requested mode can be specified
-in E (set to 0 for default/not specified). Mode values are specific to
-each VDA.
-
-HL may point to a location in memory with the character bitmap to be
-loaded into the VDA video processor. The location MUST be in the top 32K
-of the CPU memory space. HL must be set to zero if no character bitmap
-is specified (the VDA video processor will utilize a default character
-bitmap).
-
-### Function 0x41 – Video Query (VDAQRY)
-
-*Entry Parameters*  
-      B: 0x41  
-      C: Video Device Unit ID  
-      HL: Font Bitmap Buffer Address (optional)
-
-*Exit Results*  
-      A: Status (0=OK, else error)  
-      C: Video Mode  
-      D: Row Count  
-      E: Column Count  
-      HL: Font Bitmap Buffer Address (0 if N/A)
-
-Return information about the specified video device. C will be set to
-the current video mode. DE will return the dimensions of the video
-display as measured in rows and columns. Note that this is the **count**
-of rows and columns, not the **last** row/column number.
-
-If HL is not zero, it must point to a suitably sized memory buffer in
-the upper 32K of CPU address space that will be filled with the current
-character bitmap data. It is critical that HL be set to zero if it does
-not point to a proper buffer area or memory corruption will result. The
-video device driver may not have the ability to provide character bitmap
-data. In this case, on return, HL will be set to zero.
-
-### Function 0x42 – Video Reset (VDARES)
-
-*Entry Parameters*  
-      B: 0x42  
-      C: Video Device Unit ID
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Performs a soft reset of the Video Display Adapter. Should clear the
-screen, home the cursor, restore active attribute and color to defaults.
-Keyboard should be flushed.
-
-### Function 0x43 – Video Set Cursor Style (VDASCS)
-
-*Entry Parameters*  
-      B: 0x43  
-      C: Video Device Unit ID  
-      D: Start/End Pixel Row  
-      E: Style
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-If supported by the video hardware, adjust the format of the cursor such
-that the cursor starts at the pixel specified in the top nibble of D and
-end at the pixel specified in the bottom nibble of D. So, if D=$08, a
-block cursor would be used that starts at the top pixel of the character
-cell and ends at the ninth pixel of the character cell.
-
-Register E is reserved to control the style of the cursor (blink,
-visibility, etc.), but is not yet implemented.
-
-Adjustments to the cursor style may or may not be possible for any given
-video hardware.
-
-### Function 0x44 – Video Set Cursor Position (VDASCP)
-
-*Entry Parameters*  
-      B: 0x44  
-      C: Video Device Unit ID  
-      D: Row (0 indexed)  
-      E: Column (0 indexed)
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Reposition the cursor to the specified row and column. Specifying a
-row/column that exceeds the boundaries of the display results in
-undefined behavior. Cursor coordinates are 0 based (0,0 is the upper
-left corner of the display).
-
-### Function 0x45 – Video Set Character Attribute (VDASAT)
-
-*Entry Parameters*  
-      B: 0x45  
-      C: Video Device Unit ID  
-      E: Character Attribute Code
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Assign the specified character attribute code to be used for all
-subsequent character writes/fills. This attribute is used to fill new
-lines generated by scroll operations. Refer to the character attribute
-for a list of the available attribute codes. Note that a given video
-display may or may not support any/all attributes.
-
-### Function 0x46 – Video Set Character Color (VDASCO)
-
-*Entry Parameters*  
-      B: 0x46  
-      C: Video Device Unit ID  
-      E: Character Color Code
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Assign the specified color code to be used for all subsequent character
-writes/fills. This color is also used to fill new lines generated by
-scroll operations. Refer to color code table for a list of the available
-color codes. Note that a given video display may or may not support
-any/all colors.
-
-### Function 0x47 – Video Set Write Character (VDAWRC)
-
-*Entry Parameters*  
-      B: 0x47  
-      C: Video Device Unit ID  
-      E: Character
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Write the character specified in E. The character is written starting at
-the current cursor position and the cursor is advanced. If the end of
-the line is encountered, the cursor will be advanced to the start of the
-next line. The display will **not** scroll if the end of the screen is
-exceeded.
-
-### Function 0x48 – Video Fill (VDAFIL)
-
-*Entry Parameters*  
-      B: 0x48  
-      C: Video Device Unit ID  
-      E: Character  
-      HL: Count
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Write the character specified in E to the display the number of times
-specified in HL. Characters are written starting at the current cursor
-position and the cursor is advanced by the number of characters written.
-If the end of the line is encountered, the characters will continue to
-be written starting at the next line as needed. The display will **not**
-scroll if the end of the screen is exceeded.
-
-### Function 0x49 – Video Copy (VDACPY)
-
-*Entry Parameters*  
-      B: 0x49  
-      C: Video Device Unit ID  
-      D: Source Row  
-      E: Source Column  
-      L: Count
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Copy count (L) bytes from the source row/column (DE) to current cursor
-position. The cursor position is not updated. The maximum count is 255.
-Copying to/from overlapping areas is not supported and will have an
-undefined behavior. The display will **not** scroll if the end of the
-screen is exceeded. Copying beyond the active screen buffer area is not
-supported and results in undefined behavior.
-
-### Function 0x4A – Video Scroll (VDASCR)
-
-*Entry Parameters*  
-      B: 0x4A  
-      C: Video Device Unit ID  
-      E: Scroll Distance (Line Count)
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Scroll the video display by the number of lines specified in E. If E
-contains a negative number, then reverse scroll should be performed.
-
-### Function 0x4B – Video Keyboard Status (VDAKST)
-
-*Entry Parameters*  
-      B: 0x4B  
-      C: Video Device Unit ID
-
-*Exit Results*  
-      A: Status (\# Key Codes in Keyboard Buffer)
-
-Return a count of the number of key codes in the keyboard buffer. If it
-is not possible to determine the actual number in the buffer, it is
-acceptable to return 1 to indicate there are key codes available to read
-and 0 if there are none available.
-
-### Function 0x4C – Video Keyboard Flush (VDAKFL)
-
-*Entry Parameters*  
-      B: 0x4C  
-      C: Video Device Unit ID
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-If a keyboard buffer is in use, it should be purged and all contents
-discarded.
-
-### Function 0x4D – Video Keyboard Read (VDAKRD)
-
-*Entry Parameters*  
-      B: 0x4D  
-      C: Video Device Unit ID
-
-*Exit Results*  
-      A: Status (0=OK, else error)  
-      C: Scancode  
-      D: Keystate  
-      E: Keycode
-
-Read next key code from keyboard. If a keyboard buffer is used, return
-the next key code in the buffer. If no key codes are available, wait for
-a keypress and return the keycode.
-
-The scancode value is the raw scancode from the keyboard for the
-keypress. Scancodes are from scancode set 2 standard.
-
-The keystate is a bitmap representing the value of all modifier keys and
-shift states as they existed at the time of the keystroke. The bitmap is
-defined as:
-
-| Bit | Keystate Indication              |
-| --- | -------------------------------- |
-| 7   | Key pressed was from the num pad |
-| 6   | Caps Lock was active             |
-| 5   | Num Lock was active              |
-| 4   | Scroll Lock was active           |
-| 3   | Windows key was held down        |
-| 2   | Alt key was held down            |
-| 1   | Control key was held down        |
-| 0   | Shift key was held down          |
-
-Keycodes are generally returned as appropriate ASCII values, if
-possible. Special keys, like function keys, are returned as reserved
-codes as described at the start of this section.
-
-## System (SYS)
-
-### Function 0xF0 – System Reset (SYSRESET)
-
-*Entry Parameters*  
-      B: 0xF0
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Perform a soft reset of HBIOS. Releases all HBIOS memory allocated by
-current OS. Does not reinitialize physical devices.
-
-### Function 0xF1 – System Version (SYSVER)
-
-*Entry Parameters*  
-      B: 0xF1  
-      C: Reserved (set to 0)
-
-*Exit Results*  
-      A: Status (0=OK, else error)  
-      DE: Version (Maj/Min/Upd/Pat)  
-      L: Platform ID
-
-This function will return the HBIOS version number. The version number
-is returned in DE. High nibble of D is the major version, low nibble of
-D is the minor version, high nibble of E is the patch number, and low
-nibble of E is the build number.
-
-The hardware platform is identified in L:
-
-| Id | Platform       |
-| -- | -------------- |
-| 1  | SBC V1 or V2   |
-| 2  | ZETA           |
-| 3  | ZETA 2         |
-| 4  | N8             |
-| 5  | MK4            |
-| 6  | UNA            |
-| 7  | RC2014 w/ Z80  |
-| 8  | RC2014 w/ Z180 |
-
-### Function 0xF2 – System Set Bank (SYSSETBNK)
-
-*Entry Parameters*  
-      B: 0xF2  
-      C: Bank ID
-
-*Exit Results*  
-      A: Status (0=OK, else error)  
-      C: Previously Active Bank ID
-
-Activates the Bank ID specified in C and returns the previously active
-Bank ID in C. The caller MUST be invoked from code located in the upper
-32K and the stack **must** be in the upper 32K.
-
-### Function 0xF3 – System Get Bank (SYSGETBNK)
-
-*Entry Parameters*  
-      B: 0xF3
-
-*Exit Results*  
-      A: Status (0=OK, else error)  
-      C: Active Bank ID
-
-Returns the currently active Bank ID in C.
-
-### Function 0xF4 – System Set Copy (SYSSETCPY)
-
-*Entry Parameters*  
-      B: 0xF4  
-      D: Destination Bank ID  
-      E: Source Bank ID  
-      HL: Count of Bytes to Copy
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Prepare for a subsequent interbank memory copy (SYSBNKCPY) function by
-setting the source bank, destination bank, and byte count for the copy.
-The bank id’s are not range checked and must be valid for the system in
-use.
-
-No bytes are copied by this function. The SYSBNKCPY must be called to
-actually perform the copy. The values setup by this function will remain
-unchanged until another call is make to this function. So, after calling
-SYSSETCPY, you may make multiple calls to SYSBNKCPY as long as you want
-to continue to copy between the already established Source/Destination
-Banks and the same size copy if being performed.
-
-### Function 0xF5 – System Bank Copy (SYSBNKCPY)
-
-*Entry Parameters*  
-      B: 0xF5  
-      DE: Destination Address  
-      HL: Source Address
-
-*Exit Results*  
-      A: Status (0=OK, else error)
-
-Copy memory between banks. The source bank, destination bank, and byte
-count to copy MUST be established with a prior call to SYSSETCPY.
-However, it is not necessary to call SYSSETCPY prior to subsequent calls
-to SYSBNKCPY if the source/destination banks and copy length do not
-change.
-
-WARNINGS:
-
-  - This function is inherently dangerous and does not prevent you from
-    corrupting critical areas of memory. Use with **extreme** caution.
-
-  - Overlapping source and destination memory ranges are not supported
-    and will result in undetermined behavior.
-
-  - Copying of byte ranges that cross bank boundaries is undefined.
-
-### Function 0xF6 – System Alloc (SYSALLOC)
-
-*Entry Parameters*  
-      B: 0xF6  
-      HL: Size in Bytes
-
-*Exit Results*  
-      A: Status (0=OK, else error)  
-      HL: Address of Allocated Memory
-
-This function will attempt to allocate a block of memory of HL bytes
-from the internal HBIOS heap. The HBIOS heap resides in the HBIOS bank
-in the area of memory left unused by HBIOS. If the allocation is
-successful, the address of the allocated memory block is returned in HL.
-You will typically want to use the SYSBNKCPY function to read/write the
-allocated memory.
-
-### Function 0xF7 – System Free (SYSFREE)
-
-     *Entry Parameters*  
-          B: 0xF7  
-          HL: Address of Memory Block to Free
-
-     *Returned Values*  
-          A: Status (0=OK, else error)
-
-\*\*\* This function is not yet implemented \*\*\*
-
-### Function 0xF8 – System Get (SYSGET)
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: Subfunction (see below)
-
-     *Returned Values*  
-          A: Status (0=OK, else error)
-
-This function will report various system information based on the
-sub-function value. The following lists the subfunctions available along
-with the registers/information returned.
-
-**SYSGET Subfunction 0x00 – Get Serial Device Unit Count (CIOCNT)**
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: 0x00
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          E: Count of Serial Device Units
-
-**SYSGET Subfunction 0x10 – Get Disk Device Unit Count (DIOCNT)**
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: 0x10
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          E: Count of Disk Device Units
-
-**SYSGET Subfunction 0x40 – Get Video Device Unit Count (VDACNT)**
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: 0x40
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          E: Count of Video Device Units
-
-**SYSGET Subfunction 0xD0 – Get Timer Tick Count (TIMER)**
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: 0xD0
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          DE:HL: Current Timer Tick Count Value
-
-**SYSGET Subfunction 0xE0 – Get Boot Information (BOOTINFO)**
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: 0xE0
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          L: Boot Bank ID  
-          D: Boot Disk Device Unit ID  
-          E: Boot Disk Slice
-
-**SYSGET Subfunction 0xF0 – Get CPU Information (CPUINFO)**
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: 0xF0
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          H: Z80 CPU Variant  
-          L: CPU Speed in MHz  
-          DE: CPU Speed in KHz
-
-**SYSGET Subfunction 0xF1 – Get Memory Information (MEMINFO)**
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: 0xF1
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          D: Count of 32K ROM Banks  
-          E: Count of 32K RAM Banks
-
-**SYSGET Subfunction 0xF2 – Get Bank Information (BNKINFO)**
-
-     *Entry Parameters*  
-          B: 0xF8  
-          C: 0xF2
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          D: BIOS Bank ID  
-          E: User Bank ID
-
-### Function 0xF9 – System Set (SYSSET)
-
-     *Entry Parameters*  
-          B: 0xF9  
-          C: Subfunction (see below)
-
-     *Returned Values*  
-          A: Status (0=OK, else error)
-
-This function will set various system parameters based on the
-sub-function value. The following lists the subfunctions available along
-with the registers/information used as input.
-
-**SYSSET Subfunction 0xD0 – Set Timer Tick Count (TIMER)**
-
-     *Entry Parameters*  
-          B: 0xF9  
-          C: 0xD0  
-          DE:HL: Timer Tick Count Value
-
-     *Returned Values*  
-          A: Status (0=OK, else error)
-
-**SYSSET Subfunction 0xE0 – Set Boot Information (BOOTINFO)**
-
-     *Entry Parameters*  
-          B: 0xF9  
-          C: 0xE0  
-          L: Boot Bank ID  
-          D: Boot Disk Device Unit ID  
-          E: Boot Disk Slice
-
-     *Returned Values*  
-          A: Status (0=OK, else error)
-
-### Function 0xFA – System Peek (SYSPEEK)
-
-     *Entry Parameters*  
-          B: 0xFA  
-          D: Bank ID  
-          HL: Memory Address
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          E: Byte Value
-
-This function gets a single byte value at the specified bank/address.
-The bank specified is not range checked.
-
-### Function 0xFB – System Poke (SYSPOKE)
-
-     *Entry Parameters*  
-          B: 0xFB  
-          D: Bank ID  
-          E: Value  
-          HL: Memory Address
-
-     *Returned Values*  
-          A: Status (0=OK, else error)
-
-This function sets a single byte value at the specified bank/address.
-The bank specified is not range checked.
-
-### Function 0xFC – System Interrupt Management (SYSINT)
-
-     *Entry Parameters*  
-          B: 0xFC  
-          C: Subfunction (see below)
-
-     *Returned Values*  
-          A: Status (0=OK, else error)
-
-This function allows the caller to query information about the interrupt
-configuration of the running system and allows adding interrupt vectors
-dynamically. Register C is used to specify a subfunction. Additional
-input and output registers may be used as defined by the sub-function.
-
-Note that during interrupt processing, the lower 32K of CPU address
-space will contain the RomWBW HBIOS code bank, not the lower 32K of
-application TPA. As such, a dynamically installed interrupt handler does
-not have access to the lower 32K of TPA and must be careful to avoid
-modifying the contents of the lower 32K of memory. Invoking RomWBW HBIOS
-functions within an interrupt handler is not supported. The interrupt
-management framework takes care of saving and restoring AF, BC, DE, HL,
-and IY. Any other registers modified must be saved and restored by the
-interrupt handler.
-
-Interrupt handlers are different for IM1 or IM2.
-
-For IM1:
-
-> The new interrupt handler is responsible for chaining (JP) to the
-> previous vector if the interrupt is not handled. The interrupt handler
-> must return with ZF set if interrupt is handled and ZF cleared if not
-> handled.
-
-For IM2:
-
-> The interrupt handler requires an invocation stub separate from the
-> actual interrupt handling code. This stub must reside in the upper 32K
-> of RAM and consist of the following code. \<adr1\> is the address of
-> your new interrupt handler and this must also be in the upper 32K of
-> RAM. \<adr2\> must be the address of the HBIOS interrupt routing
-> routine. This address is provided to you by the INTSET function.  
->   
-> `PUSH HL`  
-> `LD HL,<adr1>`  
-> `JP <adr2>`  
->   
-> When calling Set Interrupt Vector, the address of the stub must be
-> provided for the Interrupt Vector parameter. The address of the
-> Interrupt Routing Engine will be returned in DE and must be inserted
-> into the stub code as indicated above. In the case of IM2 mode
-> interrupts, the actual interrupt handler should not chain to the
-> previous entry. The new interrupt handler must assume all
-> responsibilities for the specific interrupt slot being occupied.
-
-If the caller is transient, then the caller must remove the new
-interrupt handler and restore the original one prior to termination.
-This is accomplished by calling this function with the Interrupt Vector
-set to the Previous Vector returned in the original call.
-
-The caller is responsible for disabling interrupts prior to making an
-INTSET call and enabling them afterwards. The caller is responsible for
-ensuring that a valid interrupt handler is installed prior to enabling
-any hardware interrupts associated with the handler. Also, if the
-handler is transient, the caller must disable the hardware interrupt(s)
-associated with the handler prior to uninstalling it.
-
-**SYSINT Subfunction 0x00 – Interrupt Info (INTINF)**
-
-     *Entry Parameters*  
-          B: 0xFC  
-          C: 0x00
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          D: Interrupt Mode  
-          E: Size (\# entries) of Interrupt Vector Table
-
-Return interrupt mode in D and size of interrupt vector table in E. For
-IM1, the size of the table is the number of vectors chained together.
-For IM2, the size of the table is the number of slots in the vector
-table.
-
-**SYSINT Subfunction 0x10) – Get Interrupt (INTGET)**
-
-     *Entry Parameters*  
-          B: 0xFC  
-          C: 0x10  
-          E: Interrupt Vector Table Index
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          HL: Current Interrupt Vector Address
-
-On entry, register E must contain an index into the interrupt vector
-table. On return, HL will contain the address of the current interrupt
-vector at the specified index.
-
-**SYSINT Subfunction 0x20) – Set Interrupt (INTSET)**
-
-     *Entry Parameters*  
-          B: 0xFC  
-          C: 0x20  
-          E: Interrupt Vector Table Index  
-          HL: Interrupt Address to be Assigned
-
-     *Returned Values*  
-          A: Status (0=OK, else error)  
-          HL: Previous Interrupt Vector Address  
-          DE: Interrupt Routing Engine Address (IM2)
-
-On entry, register E must contain an index into the interrupt vector
-table and register HL must contain the address of the new interrupt
-vector to be inserted in the table at the index. On return, HL will
-contain the previous address in the table at the index and register DE
-will contain the address of the interrupt routing engine required as
-specified above for IM2 interrupt handler stubs.
+# Summary
+
+RomWBW is a complete firmware and software package for many hobbyist
+Z80/Z180-based computers. Combined with any of the supported hardware
+platforms, RomWBW provides a full CP/M style operating environment with
+related utility applications and support for a broad set of hardware
+including serial, floppy, hard disk (IDE, CF Card, SD Card), video,
+sound, and keyboard. VT-100 escape code processing is built-in for all
+video interfaces.
+
+RomWBW supports most of the Z80/Z180 based hardware platforms produced
+by the [RetroBrew Computers
+Community](https://www.retrobrewcomputers.org) including SBC V1/V2, Zeta
+V1/V2, N8, and Mark IV. RomWBW also supports Z80/Z180 based systems from
+the [RC2014 Community](https://rc2014.co.uk/).
+
+Most of the functionality is implemented in ROM. In fact, a simple
+system with only RAM and ROM is entirely sufficient for a fully
+operational CP/M system using RAM for file storage. However, RomWBW
+supports many disk storage options which provide for persistent storage
+and booting of custom operating systems.
+
+In addition to hardware initialization and bootstrap, RomWBW implements
+a robust bank switching memory management system. A hardware driver
+framework leverages the bank switching to maximize available application
+memory. A complete function interface (HBIOS) allows operating systems
+to be adapted to RomWBW without direct knowledge of the hardware. Any
+software or operating system written for HBIOS will run on any of the
+hardware platforms supported without change.
+
+A simple system monitor can be launched at startup for general hardware
+and system debugging. ROM-based implementations of BASIC and Forth are
+also provided. RomWBW includes robust adaptations of both CP/M-80 2.2
+and Z-System (ZCPR + ZSDOS). Either operating system can be loaded
+directly from ROM or installed and loaded from disk storage. A selection
+of standard/useful applications is provided via a built-in ROM disk. A
+RAM disk is also provided for fast/temporary file storage.
+
+For each of the supported hardware platforms, a pre-built ROM image is
+provided which is ready to program onto the ROM for your system. These
+standard pre-built ROMs will automatically recognize and use the most
+common hardware options for the platform. If desired, system
+customization is achieved by making simple modifications to a
+configuration file and running a build script to generate a custom ROM
+image. All source and build tools are included in the distribution. The
+build scripts run under any modern 32 or 64 bit version of Microsoft
+Windows.
+
+# Getting Started
+
+The steps documented below will refer to a “modern computer” and a
+“RomWBW System”. Modern computer means something like a Windows,
+Linux, or Macintosh computer. The modern computer is used to download
+and extract the RomWBW distribution files as well as program the ROM and
+disk images. RomWBW System refers to your Z80/Z180 computer that will be
+running the RomWBW ROM and software applications.
+
+## Procuring RomWBW
+
+RomWBW is maintained on GitHub. The RomWBW repository is found at
+[https://github.com/wwarthen/RomWBW](https://github.com/wwarthen/RomWBW%20%22https://github.com/wwarthen/RomWBW%22).
+This repository contains all of the source code as well as distribution
+releases of the RomWBW software.
+
+Downloading the full release package from GitHub can be a little
+confusing because the main repository page has a button labeled “Clone
+or Download”. This button will download **only** the source code. To
+retrieve the full release distribution including the pre-built ROM
+images, you must go to the “Releases” page of the GitHub repository.
+From the main RomWBW GitHub repository page, click on the “releases” tab
+which will take you to the RomWBW Releases page. On this page, you will
+see a list of the RomWBW releases. You may see some releases tagged as
+“Pre-release” which you probably do not want unless you specifically
+want work in progress. The most recent stable release will be tagged
+“Latest release”. To download the desired release package, expand the
+Assets dropdown and then choose the entry that ends in “-Package.zip”.
+
+## Distribution Package
+
+The RomWBW distribution is a compressed zip archive file. It is intended
+that the contents of the zip file will be extracted on a modern computer
+(not your Z80/Z180 computer). Any modern zip file management tool can be
+used to do this.
+
+The extracted files are organized in a directory hierarchy. Each of the
+high-level directories has it’s own ReadMe.txt file describing the
+contents in detail. In summary, these directories are:
+
+| **Directory** | **Contents**                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Binary        | The final output files of the build process are placed here. Most important, are the ROM images with the file names ending in “.rom”. |
+| Doc           | Contains detailed documentation including the operating systems, RomWBW architecture, etc.                                            |
+| Source        | Contains the source code files used to build the software, ROM images and disk images.                                                |
+| Tools         | Contains the MS Windows programs that are used by the build process or that may be useful in setting up your system.                  |
+
+## Installation
+
+To install RomWBW, you will need to program your Z80/Z180 system’s ROM
+with the appropriate ROM image from the RomWBW distribution. The
+pre-built ROM image files are found in the Binary directory of the
+distribution. Consult the following table to determine the correct ROM
+image file for your system. It is critical that you pick the correct
+image file.
+
+| **Platform** | **ROM Image File** | **Console Port**            |
+| ------------ | ------------------ | --------------------------- |
+| SBC V1/V2    | SBC\_std.rom       | Onboard 16550 Serial Port   |
+| Zeta V1      | ZETA\_std.rom      | Onboard 16550 Serial Port   |
+| Zeta V2      | ZETA2\_std.rom     | Onboard 16550 Serial Port   |
+| N8           | N8\_std.rom        | Z180 Primary ASCI Port      |
+| Mark IV      | MK4\_std.rom       | Z180 Primary ASCI Port      |
+| RC2014 Z80   | RCZ80\_std.rom     | ACIA or SIO/2 Serial Module |
+| RC2014 Z180  | RCZ180\_nat.rom    | Z180 Primary ASCI Port      |
+| RC2014 Z180  | RCZ180\_ext.rom    | Z180 Primary ASCI Port      |
+| Easy Z80     | EZZ80\_std.rom     | Onboard SIO/2 Serial Port   |
+| SC126        | SCZ180\_126.rom    | Z180 Primary ASCI Port      |
+| SC130        | SCZ180\_130.rom    | Z180 Primary ASCI Port      |
+
+Notes:
+
+  - The RC2014 Platforms (Z80 and Z180) **must** include a 512K RAM/ROM
+    module.
+
+  - The RC2014 Z80 platform ROM **must** include a serial port module
+    (either ACIA or SIO/2). RomWBW will auto detect the the available
+    serial port module and the console will be directed to whichever one
+    is present. The SIO/2 module will take precedence if both are
+    present.
+
+  - The SBC V1 has a known race condition when bank switching. Since
+    RomWBW performs frequent bank switching, the SBC V1 may not work
+    with RomWBW. This issue was resolved on the SBC V2.
+
+If you do not see any .rom files in the Binary directory of your RomWBW
+distribution, you have probably downloaded a “source only” version of
+the distribution. Please review the instructions in the “Procuring
+RomWBW” section above making sure to get the full release package
+distribution.
+
+The pre-built ROM images are configured to automatically detect and
+support the most common devices for the associated hardware platform
+including serial ports, disk drives, real time clock, video adapters,
+etc. without building a custom ROM.
+
+All pre-built ROM images are 512KB. If your system utilizes a larger ROM
+size, you can just program the image into the first 512KB of the ROM (a
+custom ROM can be created later to utilize all of the available ROM
+space).
+
+The ReadMe.txt file in the Binary directory has more detailed
+information on the configuration of each pre-built ROM image such as
+specific hardware supported.
+
+Unless you already have a working RomWBW system, you will need to use a
+ROM programmer attached to your modern computer to program your ROM. If
+your RomWBW system is already functional, depending on your system’s
+capabilities, you may be able to reprogram the existing ROM in-situ.
+
+If you do have an existing working RomWBW system, it is safest to
+program a new ROM chip so that you can return to the known working ROM
+chip if the new one fails to boot.
+
+### Using a ROM Programmer
+
+Any commercially available ROM programmer that is compatible with the
+ROM chip used in your RomWBW system can be used. Additional guidance on
+ROM programmers can usually be found by searching the online support
+group postings for your hardware.
+
+You will need to refer to your ROM programmer’s documentation for
+detailed instructions. However, in general, you will need to perform the
+following steps on your modern computer. These steps assume you have
+already attached the ROM programmer to your modern system and installed
+the programmer’s software.
+
+1.  Launch the ROM programming software and ensure that the software is
+    successfully communicating with your ROM programmer.
+
+2.  Select the ROM chip type. This is critical, but is usually a simple
+    matter to looking at the chip label and looking it up in the
+    software.
+
+3.  Load the ROM image into the programming software. This is where you
+    must be sure to pick the correct file based on the previous table.
+    Your programming software may ask about the format of the file being
+    loaded. The RomWBW ROM files are raw binary images – they are not
+    encoded in any way.
+
+4.  Most programming software has a function to view/edit the loaded
+    image. You can use this function to browse the first 256 bytes of
+    the loaded file to make sure you see text similar to the following:
+    
+    “ROMWBW v2.9.2, Copyright (C) 2019, Wayne Warthen, GNU GPL v3”
+
+5.  Mount the ROM chip in the programmer according to the programmer’s
+    instructions.
+
+6.  Execute the program function. Normally, the programmer will erase
+    the ROM, program the new image, and then verify the image. Confirm
+    that all of these steps completed without error.
+
+7.  Remove the ROM chip from the programmer
+
+8.  Make sure that the power is removed from your RomWBW System and
+    install the programmed ROM chip in the correct position and
+    orientation.
+
+### Programming a ROM In-situ
+
+If you already have a working RomWBW System, you may be able to
+reprogram your existing ROM chip in-situ (in place). RomWBW fully
+supports this, but your specific hardware must also support it. Your ROM
+chip will need to be a Flash or EEPROM device and your system must
+support writing to the ROM device. You must also have a working CP/M
+drive with at least 512KB of space available. The RAM drive is not large
+enough.
+
+Note that this process is inherently dangerous. You will be
+reprogramming a working ROM chip with no guarantee that the chip will
+work afterwards. If you accidentally choose the wrong ROM image or the
+programming process fails in some way, you could end up with a bricked
+system. The only way to recover from this is to use a ROM Programmer as
+described in the previous section.
+
+Programming in-situ involves two steps: 1) transferring the ROM image
+file to your RomWBW system, and 2) running the FLASH application.
+
+There are a few different methods for transferring the ROM image file to
+your RomWBW system. Please refer to the section of this document called
+“Transferring Files” for instructions and options for doing this. Be
+sure to transfer the right ROM image by referring to the table above.
+
+Once the new ROM image is on your RomWBW system, run the FLASH
+application to reprogram your existing ROM. The FLASH application is
+located on your existing ROM drive (normally B:). Consult
+Doc\\Contrib\\Flash4.txt for detailed instructions on using the FLASH
+application. The following is an example of using the FLASH application
+assuming your new ROM image file has been placed on your C: drive and is
+called ROM.IMG.
+
+-----
+
+    B>flash write c:rom.img
+    FLASH4 by Will Sowerbutts <will@sowerbutts.com> version 1.2.3
+    
+    Using RomWBW (v2.6+) bank switching.
+    Flash memory chip ID is 0xBFB7: 39F040
+    Flash memory has 128 sectors of 4096 bytes, total 512KB
+    Write complete: Reprogrammed 13/128 sectors.
+    Verify (128 sectors) complete: OK!
+
+-----
+
+Do not interrupt the flashing process once it has started or your ROM
+chip will be corrupted.
+
+When the FLASH application is done, your system will still be running on
+a RAM copy of the previous ROM. You will need to reboot or power cycle
+your system to load your system with the updated ROM software.
+
+## Console Connection
+
+RomWBW requires a console terminal be attached to the primary serial
+port for your system. The console terminal is most often a modern
+computer running terminal emulation software (e.g., Tera Term). A
+classic CRT terminal can also be used if your system supports true
+RS-232 connectivity.
+
+The specific cable connection from your RomWBW System to your console
+depends on your system’s hardware. Your system hardware documentation
+should cover this. If a RS-232 connection is being used, it is likely
+that you will need a null-modem cable or adapter. Be sure that you use
+the primary serial port connection on your RomWBW system as indicated in
+the previous table.
+
+Your console terminal (or communications software) should be configured
+as follows:
+
+|              |            |
+| ------------ | ---------- |
+| Baud Rate    | 38,400 bps |
+| Data Bits    | 8          |
+| Stop Bits    | 1          |
+| Parity       | None       |
+| Flow Control | RTS/CTS    |
+
+Notes:
+
+  - The baud rate on some systems is determined by hardware
+    configuration. Notably, the RC2014 Z80 platform is normally
+    configured for 115,200 baud. In such cases, you will need to use the
+    hardware configured baud rate.
+
+  - Some applications distributed with RomWBW use escape sequences to
+    produce full screen displays. These applications are normally expect
+    VT-100 (or ANSI) terminal text processing. So, if possible, you
+    should configure your terminal emulation software for VT-100 or ANSI
+    terminal emulation.
+
+  - SBC and Zeta Systems have a configuration jumper which can be used
+    to direct console output to a dedicated VGA display with PS/2
+    keyboard. It is highly recommended that you get the primary serial
+    port working first. So, initially, please ensure that jumper JP2 on
+    the SBC or jumper JP1 on the Zeta is *shorted* which will direct
+    console output to the serial port.
+
+## System Startup
+
+Refer to your system’s hardware documentation for the startup procedure.
+Normally, this is simply a matter of toggling the power switch on. If
+the system is already running, a reset pushbutton is usually available
+and will perform the same actions as cycling power.
+
+If your system has a real time clock, then RomWBW will take 1-2 seconds
+to measure the speed of the CPU **before** you see any output on the
+console.
+
+The first phase of RomWBW loads and initializes the RomWBW Hardware BIOS
+(HBIOS). The HBIOS contains all of the hardware specific code for
+RomWBW. During this phase, the following occurs:
+
+1.  The HBIOS code is copied from ROM to RAM which is where it will
+    actually run. RomWBW shadows the hardware BIOS in RAM for execution.
+
+2.  If a real time clock is present, it is used to measure the speed of
+    the CPU.
+
+3.  Basic hardware discovery and initialization is performed including
+    the serial ports which allow console output to be performed.
+
+4.  A system banner with version information is displayed.
+
+5.  All additional hardware devices are discovered and initialized. As
+    this is done, the configuration of each device is printed on the
+    console. This is referred to as the boot log.
+
+6.  A summary table of all active device units (disk, character, etc.)
+    is displayed. This is referred to as the unit summary table. The
+    concept of units is described later in this document.
+
+7.  Finally, the boot loader program is loaded and executed.
+
+The following is an example of the initial output of the system
+including the banner and device discovery/initialization boot log. The
+contents of your boot log will be different based on your hardware
+configuration. This information is primarily of use when troubleshooting
+an issue with your system. You should always include the boot log when
+requesting assistance with a hardware issue.
+
+-----
+
+    RetroBrew HBIOS v2.9.2, 2019-10-22
+    
+    SC126 Z8S180-N @ 18.432MHz IO=0xC0
+    0 MEM W/S, 2 I/O W/S, INT MODE 2
+    512KB ROM, 512KB RAM
+    
+    ASCI0: IO=0xC0 ASCI W/BRG MODE=38400,8,N,1
+    ASCI1: IO=0xC1 ASCI W/BRG MODE=38400,8,N,1
+    DSRTC: MODE=STD IO=0x0C Tue 2019-10-22 18:10:23 CHARGE=OFF
+    MD: UNITS=2 ROMDISK=384KB RAMDISK=384KB
+    SD: MODE=SC OPR=0x0C CNTR=0xCA TRDR=0xCB DEVICES=1
+    SD0: SDHC NAME=SE32G BLOCKS=0x03B72400 SIZE=30436MB
+
+-----
+
+After the boot log, you will see the unit summary table. Here is an
+example of this. Again, what you see will be different based on your
+system hardware.
+
+-----
+
+    Unit        Device      Type              Capacity/Mode
+    ----------  ----------  ----------------  --------------------
+    Char 0      ASCI0:      RS-232            38400,8,N,1
+    Char 1      ASCI1:      RS-232            38400,8,N,1
+    Disk 0      MD1:        RAM Disk          384KB,LBA
+    Disk 1      MD0:        ROM Disk          384KB,LBA
+    Disk 2      SD0:        SD Card           30436MB,LBA
+
+-----
+
+## Boot Loader
+
+The last step of the system startup is loading and executing the boot
+loader. This is a simple program that allows you to choose what you want
+the system to do. You may select options to start an operating system,
+invoke ROM BASIC, run the Debug Monitor, or load an operating system
+from a disk device.
+
+It will start by printing a simple menu and then wait for a key to be
+pressed indicating what should be loaded. Here is an example of the boot
+loader’s output.
+
+-----
+
+    SC126 Boot Loader
+    
+    ROM: (M)onitor (C)P/M (Z)-System (F)orth (B)ASIC (T)-BASIC
+    Disk: (0)MD1 (1)MD0 (2)SD0
+    
+    Boot Selection?
+
+-----
+
+The specific options listed will depend on your systems hardware
+capabilities and configuration. The options following “ROM:” will load
+and run your selection directly from the ROM. Each of these options is
+briefly described below. The options following “Disk:” indicate the
+available disk drives. Selecting a disk drive will load whatever
+software has been installed on the boot track of the selected drive. See
+the section on “Preparing a Boot Disk” for more information on making a
+bootable disk. Note that although MD1: (RAM Drive) and MD0: (ROM Drive)
+are listed, they do not currently have a boot track, so attempting to
+select them will always result in a “Disk not bootable\!” error.
+
+  - Monitor  
+    is a basic hardware debug monitor which has the ability to examine
+    and modify memory and I/O ports, load an Intel Hex File, etc. From
+    the Monitor’s ‘\>’ prompt, you can enter ‘H’ for a menu of all
+    available commands.
+
+  - CP/M  
+    is the CP/M-80 v2.2 Operating System from Digital Research which has
+    been adapted for operation under RomWBW’s HBIOS. A soft copy of the
+    CP/M manual is included in the RomWBW distribution “Doc” directory
+    in the file called “CPM Manual.pdf”.
+    
+    All of the standard CP/M applications documented in the manual are
+    included on the embedded ROM Drive (normally drive B:). The ROM
+    drive also includes some custom RomwWBW applications that enhance
+    the functionality of CP/M under RomWBW – these are documented in the
+    “RomWBW Applications” section below.
+
+  - Z-System  
+    is a popular alternative operating system that is very compatible
+    with CP/M, but offers some nice enhancements such as date/time
+    stamping of files, search paths, etc. Z-System is actually made up
+    of two components, specifically ZSDOS v1.1 (the DOS portion) and
+    ZCPR (the command processor portion).
+    
+    Soft copies of the ZSDOS and ZCPR manuals are included in the RomWBW
+    distribution “Doc” directory in the files called “ZSDOS Manual.pdf”
+    and “ZCPR Manual.pdf”. Z-System will run all of the standard CP/M
+    applications as well as some ZSDOS specific applications as
+    documented in the manuals. The custom RomWBW applications that
+    enhance the functionality of RomWBW also run under Z-System.
+
+  - Forth  
+    is a standalone implementation of CamelForth for the Zilog Z80. It
+    does not provide any mechanism for saving/loading programs or
+    accessing disk drives. Credit to Phillip Summers for contributing
+    the RomWBW adaptation of this application. Note that commands must
+    be typed in uppercase to be recognized.
+
+  - BASIC  
+    is a standalone implementation of Microsoft Z80 BASIC. When
+    launched, you will receive the prompt “Memory top?”. You may simply
+    press \<return\> at this prompt if you want to use maximum available
+    memory. It does not provide any mechanism for saving/loading
+    programs or accessing disk drives. Credit to Phillip Summers for
+    contributing the RomWBW adaptation of this application.
+
+  - T-BASIC  
+    is a standalone implementation of Tasty BASIC which is based on Palo
+    Alto Tiny Basic. It does not provide any mechanism for
+    saving/loading programs or accessing disk drives. Credit to Phillip
+    Summers and Dimitri Theulings for contributing the RomWBW adaptation
+    of this application.
+
+  - DSKY  
+    launches the DSKY interface of the Monitor. This option is only
+    presented if your system is configured for a DSKY board. The use of
+    the DSKY is documented in the “DSKY.pdf” file in the “Doc” directory
+    of the RomWBW distribution.
+
+# Devices and Units
+
+In order to support a wide variety of hardware, RomWBW HBIOS uses a
+modular approach to implementing device drivers and presenting devices
+to the operating system. In general, all devices are classified as one
+of the following:
+
+  - Disk (Hard Disk, CF Card, SD Card, RAM/ROM Disk, etc.)
+  - Character (Serial Ports, Parallel Ports, etc.)
+  - Video (Video Display/Keyboard Interfaces)
+  - RTC/NVRAM (Real Time Clock, Non-volatile RAM)
+
+HBIOS uses the concept of unit numbers to present a complex set of
+hardware devices to the operating system. As an example, a typical
+system might have a ROM Disk, RAM Disk, Floppy Drives, and Disk Drives.
+All of these are considered Disk devices and are presented to the
+operating system as generic block devices. This means that the operating
+system does not need to understand the difference between a floppy drive
+and a ROM disk.
+
+As RomWBW boots, it assigns a unit number to each device. This unit
+number is used by the operating system to refer to the device. It is,
+therefore, important to know the unit number assigned to each device.
+This information is displayed in the unit summary table at startup. Here
+is an example:
+
+-----
+
+    Unit        Device      Type              Capacity/Mode
+    ----------  ----------  ----------------  --------------------
+    Disk 0      MD1:        RAM Disk          384KB,LBA
+    Disk 1      MD0:        ROM Disk          384KB,LBA
+    Disk 2      FD0:        Floppy Disk       3.5",DS/HD,CHS
+    Disk 3      FD1:        Floppy Disk       3.5",DS/HD,CHS
+    Disk 4      PPIDE0:     CompactFlash      3815MB,LBA
+    Disk 5      PPIDE1:     Hard Disk         --
+    Disk 6      PRPSD0:     SD Card           1886MB,LBA
+    Char 0      UART0:      RS-232            38400,8,N,1
+    Char 1      UART1:      RS-232            38400,8,N,1
+    Video 0     CVDU0:      CRT               Text,80x25
+
+-----
+
+In this example, you can see that the system has a total of 7 Disk Units
+numbered 0-6. There are also 2 Character Units and 1 Video Unit. The
+table shows the unit numbers assigned to each of the devices.
+
+There may or may not be media in the disk devices listed. For example,
+the floppy disk devices (Disk Units 2 & 3) may not have a floppy in the
+drive. Also note that Disk Unit 4 shows a disk capacity, but Disk Unit 5
+does not. This is because the PPIDE interface of the system supports up
+to two drives, but there is only one actual drive attached. A unit
+number is assigned to all possible devices regardless of whether they
+have actual media installed at boot time.
+
+Note that Character Unit 0 is **always** the initial system console by
+definition.
+
+If your system has an RTC/NVRAM device, it will not be listed in the
+unit summary table. Since only a single RTC/NVRAM device can exist in
+one system, unit numbers are not required nor used for this type of
+device.
+
+# Using Disk Drives
+
+The operating systems that run on RomWBW (CP/M & Z-System) use letters
+to refer to disk drives. As your chosen operating system loads it will
+display a table that shows the drive letters that have been assigned to
+each disk. Here is an example that matches the unit assignment table
+shown in the previous section:
+
+-----
+
+``` 
+   A:=MD1:0
+   B:=MD0:0
+   C:=FD0:0
+   D:=FD1:0
+   E:=PPIDE0:0
+   F:=PPIDE0:1
+   G:=PPIDE1:0
+   H:=PPIDE1:1
+   I:=PRPSD0:0
+   J:=PRPSD0:1
+```
+
+-----
+
+You can see that drive letter A has been assigned to device MD1. If you
+look at the earlier unit assignment table, you can see that MD1 is the
+ROM disk so any reference to A: will be directed to the ROM disk.
+Similarly, any reference to C: will be directed to floppy device FD0.
+
+The references to devices in the unit assignment table end with a ’:"
+followed by a number. RomWBW breaks
+
+You will notice that A: refers to MD1 and B: refers to MD0, which seems
+out of order. This is intentional and forces A: to always refer to the
+RAM disk. CP/M and similar operating systems assume that drive A: can be
+used to write temporary data (SUBMIT files primarily). If drive A: were
+assigned to the ROM disk, this would fail. To prevent this problem,
+drive A: is assigned to the RAM disk.
+
+## Disk Slices
+
+CP/M and similar operating systems are somewhat limited in the size of
+the disk drive they can handle with 8MB being the largest that all of
+them support consistently. Since modern disk devices (including CF Cards
+and SD Cards) typically provide far larger storage capacity than 8MB,
+the concept of slices is used to allow the operating system to utilize
+more than 8MB on a single device. You can think of a disk device being
+divided up into 8MB slices and each slice can then be utilized as an
+independent drive.
+
+In the drive letter assignment table above, you will see a ‘:’ and a
+number after each device. The number represents the slice on the disk
+device. So, E: refers to the first 8MB slice on the disk attached to
+IDE0 and F: refers to the second 8MB slice of the same physical disk.
+RomWBW allows up to 256 slices on each disk device meaning that you can
+access up to 2GB of a disk. Note that RomWBW is aware that not all types
+of disk devices are large enough for slicing. So, you will see that RAM
+disks, ROM disks, and floppy disks will never be assigned multiple
+slices – they will always use slice 0.
+
+The operating systems support only 16 drive letters (A: - P:). So,
+during startup, RomWBW attempts to assign as many drive letters as
+possible across all available disk devices. However, since a hard disk
+device can have up to 256 slices, there will never be enough drive
+letters available to assign to all possible slices. To access the slices
+that are not initially assigned, you can use the ASSIGN program to add,
+modify, swap, delete, or list drive letter assignments while the
+operating system is running.
+
+## Preparing Disks for Data
+
+Depending on the type of disk device you are accessing, you may need to
+prepare it before using it for the first time. The exception to this
+rule are the RAM and ROM disks. At startup, the RAM disk is checked and
+automatically formatted as needed with a blank file system. This is
+normally drive letter A: and files can immediately be copied to it.
+Since the ROM disk simply refers to an area of the programmed ROM chip,
+it is already formatted and contains the standard program files for
+RomWBW. This is generally drive letter B: and you can immediately run
+programs from this drive.
+
+Hard drives (including CF Cards and SD Cards) do not require a physical
+format, but they do require that the directory area be cleared before
+files can be placed on it. Note that each slice of a hard disk is an
+entirely independent filesystem and must be cleared. So, if you wanted
+to use 4 slices on a disk device the slices were assigned to drive
+letters E: - H:, you would need to run the clear program 4 times
+specifying each of the four drive letters. To clear the directory area
+of a drive you would use the CLRDIR program like this:
+
+    B>clrdir e:
+    CLRDIR V-0.4 (06-Aug-2012) by Max Scane
+    
+    Warning - this utility will overwite the directory sectors of Drive: E:
+    Type Y to proceed any key other key to exit. Y
+    Directory cleared.
+
+This clears the directory area of E: and it would then be ready to copy
+files onto it. Note that when using CLRDIR, you must press a capital Y
+to confirm clearing the directory. CLRDIR will destroy the previous
+contents of the corresponding slice of the disk device, but will not
+affect the other slices.
+
+Floppy disks are similar to hard disks, but they do require a physical
+format operation. Formatting of floppy disks can be done using the FDU
+program provided on the ROM drive. This program can perform a variety of
+functions on floppy drives, but one of them is a format operation. You
+will need to choose your hardware and the correct disk format. Once a
+floppy disk is formatted, it is not necessary to use CLRDIR on it. The
+format operation automatically clears the directory area.
+
+Unfortunately, there is no standardization in the disk formats used by
+CP/M and similar operating systems. For this reason, disks prepared by
+non-RomWBW systems will not be compatible with RomWBW. However, disks
+can be moved freely between any system running RomWBW and they will be
+compatible.
+
+## Making a Disk Bootable
+
+While RomWBW provides the convenience of loading multiple operating
+systems directly from ROM, CP/M was traditionally booted from the system
+tracks of a disk. The RomWBW boot loader fully supports this and it may
+be useful if you want to install another operating system or modify one
+of the default operating systems.
+
+To install an operating system image on the boot tracks of a disk, use
+the SYSCOPY program. The ROM disk includes system images for both CP/M
+and Z-System. These files are called CPM.SYS and ZSYS.SYS. The following
+is an example of using the SYSCOPY command to install a copy of the
+Z-System operating system image onto drive E:
+
+    B>syscopy e:=zsys.sys
+    
+    Transfer system image from B:ZSYS.SYS to E: (Y/N)? y
+    Reading image... Writing image... Done
+
+After rebooting the system, you can now choose the device corresponding
+to E: to boot from. Here is a sample of this operation:
+
+    SBC Z80 Boot Loader
+    
+    ROM: (M)onitor (C)P/M (Z)-System (F)orth (B)ASIC (T)-BASIC (D)SKY
+    Disk: (0)MD1 (1)MD0 (2)FD0 (3)FD1 (4)PPIDE0 (5)PPIDE1 (6)PRPSD0
+    
+    Boot Selection? 4
+    
+    Booting Disk Unit 04...
+    
+    Reading disk information...
+    Loc=D000 End=FE00 Ent=E600 Label=Unlabeled Drive
+    
+    Loading...
+
+At this time, the RomWBW boot loader will only allow booting from slice
+0 of a disk device. So, you must install your custom operating system to
+the first slice of the target disk device.
+
+# Transferring Files
+
+In general, all of the standard operating system and RomWBW program
+files are included on the ROM disk. As such, you will immediately have
+access to most of the tools you would want. However, if you want to run
+other applications (perhaps WordStar), you will need to transfer them to
+your RomWBW system. There are two basic ways to do this: 1) transfer the
+files over your serial port using the XModem protocol, or 2) prepare a
+disk image on your Windows or Mac computer. XModem works well for
+transferring a small number of files. Using a disk image works best for
+more files.
+
+## XModem Transfers
+
+RomWBW includes a standard implementation of the XModem protocol on the
+ROM disk. Assuming you are using a communications program on your modern
+computer that supports the XModem protocol, it is fairly simple to copy
+files to/from your RomWBW system.
+
+The procedure is to start the XModem program on your RomWBW system
+first, then invoke the XModem transfer from the communications software
+on your modern computer. Here is an example of starting XModem on RomWBW
+to receive a file called “SAMPLE.TXT”:
+
+    A>b:xm r sample.txt
+    
+    XMODEM v12.5 - 07/13/86
+    RBC, 06-Jun-2018 [WBW], ASCI0
+    
+    Receiving: A0:SAMPLE.TXT
+    376k available for uploads
+    File open - ready to receive
+    To cancel: Ctrl-X, pause, Ctrl-X
+
+When using XModem to receive a file, you need to be careful that the
+incoming file is not being stored on your ROM drive. Since the ROM drive
+cannot be written, the transfer will fail mysteriously. Note in the
+example above that the current drive is A: which will be the default
+drive for storing the file. The ‘XM’ command is prefixed with B: because
+this is the drive here the program is stored.
+
+Be careful that the target drive has enough space for the incoming file.
+If it does not, the transfer will fail and you will not get a clear
+message indicating the reason.
+
+It is critical that your communication path be working well for XModem
+to be reliable. In general, this means that the modern computer cannot
+send data faster then your RomWBW system can handle it. This can be
+assured either by using a baud rate that is slow enough to prevent
+overrun or by making sure that flow control is active and working
+properly on the communication channel.
+
+The XModem software automatically uses the primary serial port to
+send/receive data. This is the same port that the console uses at
+startup (Character Unit 0).
+
+## Disk Image Transfers
+
+The RomWBW distribution includes a program suite called cpmtools. This
+toolset allows you to create a file that is a binary image of a CP/M
+file system. The image file can then be transferred to a CF Card or SD
+Card and subsequently used in a RomWBW system. The following describes
+the process for a Windows computer.
+
+First, you need to create the desired disk image. In the RomWBW
+distribution, the Source\\Images subdirectory contains instructions in
+the ReadMe.txt file for generating a disk image. In summary, you copy
+files into a directory structure that corresponds to slices and user
+areas of a disk. You then run a script that generates a file that
+represents an image of the resultant CP/M disk.
+
+Second, you transfer the image file onto a CF Card or SD Card. The
+RomWBW distribution includes a program called Win32DiskImager that can
+do this.
+
+Finally, you install the CF Card or SD Card into your RomWBW system and
+boot the system normally. At this point, you should find the files you
+placed in the image available at the drive letter(s) of the device where
+the card is installed.
+
+# Applications
+
+A typical set of CP/M-80 2.2 and Z-System applications are included on
+the ROM file system. The Doc directory of the distribution contains the
+CP/M, ZSDOS, and ZCPR user manuals which provide the primary usage
+information. Note that the Z-System applications will generally not run
+under CP/M.
+
+The following custom RomWBW applications are included on the ROM disk to
+enhance the operation of RomWBW:
+
+  - ASSIGN  
+    Add, change, and delete drive letter assignments. Use `ASSIGN /?`
+    for usage instructions.
+
+  - SYSCOPY  
+    Copy system image to a device to make it bootable. Use `SYSCOPY`
+    with no parms for usage instructions.
+
+  - FDU  
+    Format and test floppy disks. The interface is menu driven.
+
+  - OSLDR  
+    Load a new OS on the fly. For example, you can switch to Z-System
+    when running CP/M. Use `OSLDR` with no parms for usage instructions.
+
+  - FORMAT  
+    Will someday be a command line tool to format floppy disks.
+    Currently does nothing\!
+
+  - MODE  
+    Reconfigures serial ports dynamically.
+
+  - XM  
+    XModem file transfer program adapted to hardware. Automatically uses
+    primary serial port on system.
+
+  - FLASH  
+    Will Sowerbutts’ in-situ EEPROM programming utility.
+
+Please see the [RomWBW
+Applications](https://www.retrobrewcomputers.org/doku.php?id=software:firmwareos:romwbw:apps "software:firmwareos:romwbw:apps")
+page for more information on using these applications.
+
+Check the
+[Errata](https://www.retrobrewcomputers.org/doku.php?id=software:firmwareos:romwbw:errata "software:firmwareos:romwbw:errata")
+page for current usage notes.
+
+# UNA Hardware BIOS
+
+John Coffman has produced a new generation of hardware BIOS called UNA.
+The standard RomWBW distribution includes it’s own hardware BIOS.
+However, RomWBW can alternatively be constructed with UNA as the
+hardware BIOS portion of the ROM. If you wish to use the UNA variant of
+RomWBW, then just program your ROM with the ROM image called
+“UNA\_std.rom” in the Binary directory. This one image is suitable on
+**all** of the platforms and hardware UNA supports.
+
+UNA is customized dynamically using a ROM based setup routine and the
+setup is persisted in the system NVRAM of the RTC chip. This means that
+the single UNA-based ROM image can be used on most of the RetroBrew
+platforms and is easily customized. UNA also supports FAT file system
+access that can be used for in-situ ROM programming and loading system
+images.
+
+While John is likely to enhance UNA over time, there are currently a few
+things that UNA does not support:
+
+  - Floppy Drives
+  - VT-100 Escape Code Processing
+  - Zeta 1 and N8 Systems
+  - RC2014 Systems
+  - Some older support boards
+
+The UNA version embedded in RomWBW is the latest production release of
+UNA. RomWBW will be updated with John’s upcoming UNA release with
+support for VGA3 as soon as it reaches production status.
+
+Please refer to the [UNA BIOS Firmware
+Page](https://www.retrobrewcomputers.org/doku.php?id=software:firmwareos:una:start "software:firmwareos:una:start")
+for more information on UNA.
+
+# CP/M vs. Z-System
+
+There are two OS variants included in this distribution and you may
+choose which one you prefer to use. Both variants are now included in
+the pre-built ROM images. You will be given the choice to boot either
+CP/M or Z-System at startup.
+
+The traditional Digital Research (DRI) CP/M OS is the first choice. The
+Doc directory contains a manual for CP/M usage (“CPM Manual.pdf”). If
+you are new to the RetroBrew Computer systems, I would currently
+recommend using the CP/M variant to start with simply because it has
+gone through more testing and you are less likely to encounter problems.
+
+The other choice is to use the most popular non-DRI CP/M “clone” which
+is generally referred to as Z-System. Z-System is intended to be an
+enhanced version of CP/M and should run all CP/M 2.2 applications. It is
+optimized for the Z80 CPU (as opposed to 8080 for CP/M) and has some
+significant improvements such as date/time stamping of files. For
+further information on the RomWBW implementation of Z-System, see the
+wiki page [Z-System
+Notes](https://www.retrobrewcomputers.org/doku.php?id=playground:wwarthen:zsystem "playground:wwarthen:zsystem").
+Additionally, the official documentation for Z-System is included in the
+RomWBW distribution Doc directory (“ZSDOS Manual.pdf” and “ZCPR
+Manual.pdf”).
+
+# ROM Customization
+
+The pre-built ROM images are configured for the basic capabilities of
+each platform. If you add board(s) to your system, you will need to
+customize your ROM image to include support for the added board(s).
+
+Essentially, the creation of a custom ROM is accomplished by updating a
+small configuration file, then running a script to compile the software
+and generate the custom ROM image. At this time, the build process runs
+on Windows 32 or 64 bit versions. All tools (compilers, assemblers,
+etc.) are included in the distribution, so it is not necessary to setup
+a build environment on your computer.
+
+For those who are interested in more than basic system customization,
+note that all source code is provided (including the operating systems).
+
+Complete documentation of the customization process is found in the
+ReadMe.txt file in the Source directory.
+
+Note that the ROM customization process does not apply to UNA. All UNA
+customization is performed within the ROM setup script.
+
+# Upgrading
+
+Program a new ROM chip from an image in the new distribution. Install
+the new ROM chip and boot your system. At the boot loader “Boot:”
+prompt, select either CP/M or Z-System to load the corresponding OS
+directly from ROM.
+
+If you have spare ROM chips for your system, it is always safest to keep
+your existing, working ROM chip and program a new one with the new
+firmware. If the new one fails to boot, you can easily return to the
+known working ROM.
+
+If you use a customized ROM image, it is recommended that you first try
+a pre-built ROM image first and then move on to generating a custom
+image.
+
+It is entirely possible to reprogram your system ROM using the FLASH
+utility from Will Sowerbutts on your ROM drive (B:). In this case, you
+would need to transfer the new ROM image to your system using XModem.
+Obviously, there is some risk to this approach since any issues with the
+programming or ROM image could result in a non-functional system.
+
+Once you have successfully booted your system with the new ROM, you
+should update the system software from previous releases that you may
+have copied to disk drives. This is described below.
+
+If your system has any bootable drives, then update the OS image on each
+drive using SYSCOPY. For example, if C: is a bootable drive with the
+Z-System OS, you would update the OS image on this drive with the
+command:
+
+``` code
+ B>SYSCOPY C:=B:ZSYS.SYS
+```
+
+If you have copies of any of the system utilities on drives other than
+the ROM disk drive, you need to copy the latest version of the programs
+from the ROM drive (B:) to any drives containing these programs. For
+example, if you have a copy of the ASSIGN.COM program on C:, you would
+update it from the new ROM using the COPY command:
+
+``` code
+ B>COPY B:ASSIGN.COM C:
+```
+
+The following programs are maintained with the ROM images and all copies
+of these programs should be updated when upgrading to a new ROM version:
+
+  - ASSIGN.COM
+  - FORMAT.COM
+  - OSLDR.COM
+  - SYSCOPY.COM
+  - TALK.COM
+  - FDU.COM (previously FDTST.COM)
+  - XM.COM
+  - MODE.COM
+  - RTC.COM
+
+# Acknowledgements
+
+While I have heavily modified much of the code, I want to acknowledge
+that much of the work is derived or copied from the work of others in
+the RetroBrew Computers Community including Andrew Lynch, Dan Werner,
+Max Scane, David Giles, John Coffman, and probably many others I am not
+clearly aware of (let me know if I omitted someone\!).
+
+I especially want to credit Douglas Goodall for contributing code, time,
+testing, and advice. He created an entire suite of application programs
+to enhance the use of RomWBW. However, he is looking for someone to
+continue the maintenance of these applications and they have become
+unusable due to changes within RomWBW. As of RomWBW 2.6, these
+applications are no longer provided.
+
+David Giles has contributed support for the CSIO support in the SD Card
+driver.
+
+Ed Brindley has contributed some of the code that supports the RC2014
+platform.
+
+Phil Summers has contributed a variety of updates including the
+ROM-based versions of Forth and BASIC.
+
+UNA BIOS is a product of John Coffman.
+
+# Getting Assistance
+
+The best way to get assistance with RomWBW or any aspect of the
+RetroBrew Computers projects is via the community forum.
+
+[https://www.retrobrewcomputers.org/forum/](https://www.retrobrewcomputers.org/forum/ "https://www.retrobrewcomputers.org/forum/")
+
+Also feel free to email Wayne Warthen at
+[wwarthen@gmail.com](mailto:wwarthen@gmail.com "wwarthen@gmail.com").
