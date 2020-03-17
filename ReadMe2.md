@@ -2,7 +2,7 @@
 
 ## Z80/Z180 System Software
 
-Version 2.9.2 of 2020-Mar-16
+Version 2.9.2 of March 17, 2020
 
 Wayne Warthen [wwarthen@gmail.com](mailto:wwarthen@gmail.com)
 
@@ -10,13 +10,13 @@ Wayne Warthen [wwarthen@gmail.com](mailto:wwarthen@gmail.com)
 
   * [RomWBW Distribution Package](https://github.com/wwarthen/RomWBW/releases)
 
-### Related Pages:
+### Related Pages
 
   * [RomWBW Architecture Document](https://www.retrobrewcomputers.org/lib/exe/fetch.php?media=software:firmwareos:romwbw:romwbw_architecture.pdf)
   * [RomWBW Applications](https://www.retrobrewcomputers.org/doku.php?id=software:firmwareos:romwbw:apps)
   * [RomWBW Errata](https://www.retrobrewcomputers.org/doku.php?id=software:firmwareos:romwbw:errata)
 
-# Summary
+# Overview
 
 RomWBW provides a complete software system for a wide variety of hobbyist Z80/Z180 CPU-based systems produced by these developer communities:
 
@@ -34,12 +34,12 @@ General features include:
   * Multiple OS support including CP/M 2.2, ZSDOS, CP/M 3, ZPM3
   * Built-in VT-100 terminal emulation support
 
-RomWBW is distributed as both source code and pre-built ROM and disk images.  Much of the provided software can be launched directly from the ROM firmware itself:
+RomWBW is distributed as both source code and pre-built ROM and disk images.  Some of the provided software can be launched directly from the ROM firmware itself:
 
   * System monitor
   * Operating systems (CP/M 2.2, ZSDOS)
   * ROM BASIC (Nascom BASIC and Tasty BASIC)
-  * CamelForth
+  * ROM Forth
 
 A dynamic disk drive letter assignment mechanism allows mapping operating system drive letters to any available disk media.  Additionally, mass media devices (IDE Disk, CF Card, SD Card) support the use of multiple slices (up to 256 per device).  Each slice contains a complete CP/M filesystem and can be mapped independently to any drive letter.  This overcomes the inherent size limitations in legacy OSes providing up to 2GB of accessible storage on a single device.
 
@@ -57,21 +57,21 @@ In general, you will just program your system's ROM chip with the appropriate RO
 
 Looking at the extracted distribution archive, You will see that the distribution is broken up into a few sub-directories. The Binary directory contains the pre-built ROM and disk images.  The ROM image files all end in ".rom". Based on the table below, **carefully** pick the appropriate ROM image:
 
-| Platform         | ROM Image File   | Baud   | Description                                        |
-| ---------------- | ---------------- | ------ | -------------------------------------------------- |
-| SBC V1/V2        | SBC_std.rom      | 38400  | RetroBrew SBC v1 or v2 ECB Z80                     |
-| Zeta V1          | ZETA_std.rom     | 38400  | RetroBrew Zeta V1 Z80, ParPortProp (optional)      |
-| Zeta V2          | ZETA2_std.rom    | 38400  | RetroBrew Zeta V2 Z80, ParPortProp (optional)      |
-| N8               | N8_std.rom       | 38400  | RetroBrew N8 Z180, date code >= 2312               |
-| Mark IV          | MK4_std.rom      | 38400  | RetroBrew Mark IV ECB Z180                         |
-| RC2014 Z80       | RCZ80_std.rom    | 115200 | RC2014 w/ Z80 CPU, requires 512K RAM/ROM module    |
-| RC2014 Z180\*    | RCZ180_ext.rom   | 115200 | RC2014 w/ Z180 CPU & 512K banked RAM/ROM module    |
-| RC2014 Z180\*    | RCZ180_nat.rom   | 115200 | RC2014 w/ Z180 CPU & 512K native RAM/ROM module    |
-| Easy Z80         | EZZ80_std.rom    | 115200 | Sergey Kiselev's Easy Z80                          |
-| SC126            | SCZ180_126.rom   | 115200 | Stephen Cousin's SC126 Z180                        |
-| SC130            | SCZ180_130.rom   | 115200 | Stephen Cousin's SC130 Z180                        |
-| SC131            | SCZ180_131.rom   | 115200 | Stephen Cousin's SC131 Z180                        |
-| Dyno             | DYNO_std.rom     | 38400  | Steve Garcia's Z180 Dyno Computer                  |
+| Platform      | ROM Image File        | Baud      | Description                                      |
+| --------------| --------------------- | --------- | ------------------------------------------------ |
+| SBC V1/V2     | SBC_std.rom           | 38400     | RetroBrew SBC v1 or v2 ECB Z80                   |
+| Zeta V1       | ZETA_std.rom          | 38400     | RetroBrew Zeta V1 Z80, ParPortProp (optional)    |
+| Zeta V2       | ZETA2_std.rom         | 38400     | RetroBrew Zeta V2 Z80, ParPortProp (optional)    |
+| N8            | N8_std.rom            | 38400     | RetroBrew N8 Z180, date code >= 2312             |
+| Mark IV       | MK4_std.rom           | 38400     | RetroBrew Mark IV ECB Z180                       |
+| RC2014 Z80    | RCZ80_std.rom         | 115200    | RC2014 w/ Z80 CPU, requires 512K RAM/ROM module  |
+| RC2014 Z180\* | RCZ180_ext.rom        | 115200    | RC2014 w/ Z180 CPU & 512K banked RAM/ROM module  |
+| RC2014 Z180\* | RCZ180_nat.rom        | 115200    | RC2014 w/ Z180 CPU & 512K native RAM/ROM module  |
+| Easy Z80      | EZZ80_std.rom         | 115200    | Sergey Kiselev's Easy Z80                        |
+| SC126         | SCZ180_126.rom        | 115200    | Stephen Cousin's SC126 Z180                      |
+| SC130         | SCZ180_130.rom        | 115200    | Stephen Cousin's SC130 Z180                      |
+| SC131         | SCZ180_131.rom        | 115200    | Stephen Cousin's SC131 Z180                      |
+| Dyno          | DYNO_std.rom          | 38400     | Steve Garcia's Z180 Dyno Computer                |
 
 \*The RC2014 Z180 requires a separate RAM/ROM memory module.  There are two types of these modules and you must pick the ROM for your type of memory module.  The "ext" ROM supports Spencer's official 512K RAM/ROM banked memory module.  The "nat" ROM supports any of the thrid-party Z180 native memory modules.
 
@@ -79,7 +79,7 @@ RomWBW will automatically attempt to detect and support typical add-on component
 
 Connect a serial terminal or computer with terminal emulation software to the primary serial port of your CPU board.  You may need to refer to your hardware provider's documentation for details.  A null-modem connection may be required. Set the baud rate as indicated in the table above.  Set the line characteristics to 8 data bits, 1 stop bit, no parity, and no flow control. If possible, select VT-100 terminal emulation.
 
-Upon power-up, your terminal should display a sign-on banner within 2 seconds followed by hardware inventory and discovery information. When hardware initialization is completed, a boot loader prompt allows you to choose a ROM-based operating system, system monitor, or boot from a disk device.
+Upon power-up, your terminal should display a sign-on banner within 2 seconds followed by hardware inventory and discovery information. When hardware initialization is completed, a boot loader prompt allows you to choose a ROM-based operating system, system monitor, application, or boot from a disk device.
 
 Initially, you should try the ROM boot options.  By selecting either CP/M 2.2 or Z-System, the operating system will be loaded from ROM and you will see the a `B>` disk prompt.  In this scenario, A: will be an empty RAM disk and B: will refer to your ROM disk containing some typical applications.  This provides a simple environment for learning to use your system.  Be aware that files saved to the RAM disk (A:) will disappear at the next power on (RAM is generally not persistent).  Also note that attempts to save files to the ROM disk (B:) will fail because ROM is not writable.
 
@@ -87,7 +87,7 @@ Initially, you should try the ROM boot options.  By selecting either CP/M 2.2 or
 
 Upgrading to a newer release of RomWBW is essentially just a matter of updating the ROM chip in your system.  If you have spare ROM chips for your system and a ROM programmer, it is always safest to keep your existing, working ROM chip and program a new one with the new firmware. If the new one fails to boot, you can easily return to the known working ROM.
 
-Prior to attempting to reprogram your actual ROM chip, you may wish to "try" the upgrade.  With RomWBW, you can upload a new system image and load it from the command line.  For each ROM image file (.rom) in the Binary directory, you will also find a corresponding application file (.com).  For example, for SBC_std.rom, there is also an SBC_std.com file.  You can upload the .com file to your system using XModem, then simply run the .com file.  You will see your system go through the normal startup process just like it was started from ROM.  However, your ROM has not been updated and the next time you boot your system, it will revert to the system image contained in ROM.
+Prior to attempting to reprogram your actual ROM chip, you may wish to "try" the upgrade.  With RomWBW, you can upload a new system image and load it from the command line.  For each ROM image file (.rom) in the Binary directory, you will also find a corresponding application file (.com).  For example, for SBC_std.rom, there is also an SBC_std.com file.  You can upload the .com file to your system using XModem, then simply run the .com file.  You will see your system go through the normal startup process just like it was started from ROM.  However, your ROM has not been updated and the next time you boot your system, it will revert to the system image contained in ROM.  You may find that you are unable to load the .com file because it is too large to fit in available application RAM (TPA).  Unfortunately, in this case, you will not be able to use the .com file to start your system.
 
 If you do not have easy access to a ROM programmer, it is entirely possible to reprogram your system ROM using the FLASH utility from Will Sowerbutts.  This application called FLASH.COM can be found on the ROM drive of any running system.  In this case, you would need to transfer the new ROM image (.rom) over to your system using XModem.  The ROM image will be too large to fit on your RAM drive, so you will need to transfer it to a larger storage drive.  Once the ROM image is on your system, you can use the FLASH application to update your ROM:
 
@@ -164,13 +164,25 @@ The following table shows the disk image files available.  Note that the images 
 | --------------- | --------------- | -------------------------------------- |
 | fd_cpm22.img    | hd_cpm22.img    | DRI CP/M 2.2 bootable disk             |
 | fd_zsdos.img    | hd_zsdos.img    | ZSDOS 1.1 bootable disk                |
-| fd_nzcom.img    | hd_nzcom.img    | NZCOM bootable disk\*                  |
+| fd_nzcom.img    | hd_nzcom.img    | NZCOM bootable disk                    |
 | fd_cpm3         | hd_cpm3.img     | DRI CP/M 3 bootable disk               |
 | fd_zpm3         | hd_zpm3.img     | ZPM3 bootable disk                     |
+| fd_ws4          | hd_ws4.img      | WordStar v4 application disk           |
 
-\*NZCOM requires some configuration prior to running it.  Refer to the Operating Systems section below for more information.
+In addition to the disk images above, there is also a special hard disk image called hd_combo.img.  This image contains all of the images above, but in a single image with 6 slices (see below for information on disk slices).  At the boot loader prompt, you can choose a disk with the combo image, then select the specific slice you want.  This allows a single disk to have all of the possible operating system options.
 
-Note that unlike the ROM firmware, you do ** not** need to choose a disk image specific to your hardware.  Because the RomWBW firmware provides a hardware abstraction layer, all hard disk images will work on all hardware variations.  Yes, this means you can remove an SD Card from one system and put it in a different system.  The only constraint is that the applications on the disk media must be up to date with the firmware on the system being used.
+This is the layout of the hd_combo disk image:
+
+| Slice   | Description                                                      |
+| ------- | ---------------------------------------------------------------- |
+| Slice 0 | DRI CP/M 2.2 bootable disk                                       |
+| Slice 1 | ZSDOS 1.1 bootable disk                                          |
+| Slice 2 | NZCOM bootable disk                                              |
+| Slice 3 | DRI CP/M 3 bootable disk                                         |
+| Slice 4 | ZPM3 bootable disk                                               |
+| Slice 5 | WordStar v4 application disk                                     |
+
+Note that unlike the ROM firmware, you do **not** need to choose a disk image specific to your hardware.  Because the RomWBW firmware provides a hardware abstraction layer, all hard disk images will work on all hardware variations.  Yes, this means you can remove an SD Card from one system and put it in a different system.  The only constraint is that the applications on the disk media must be up to date with the firmware on the system being used.
 
 All of the disk images that indicate they are bootable will boot from disk as is.  You do not need to run `SYSCOPY` on them to make them bootable.  However, if you upgrade your ROM, you should use `SYSCOPY` to update the system tracks.
 
@@ -180,7 +192,7 @@ Each of the operating systems and ROM applications included with RomWBW are soph
 
 ## ROM Disk
 
-The ROM disk contents have been optimized to provide a core set of tools and applications that are helpful for either CP/M 2.2 and ZSDOS.  Since ZSDOS is CP/M 2.2 compatible, this works fairly well.  However, you will find some files on the ROM disk that will work with ZSDOS, but will not work on CP/M 2.2.  For example, "ldds", which loads the date/time stamper will only run on ZSDOS.
+In addition to the ROM-based operating systems and applications, the ROM also contains a ROM disk with a small CP/M filesystem.  The contents have been optimized to provide a core set of tools and applications that are helpful for either CP/M 2.2 and ZSDOS.  Since ZSDOS is CP/M 2.2 compatible, this works fairly well.  However, you will find some files on the ROM disk that will work with ZSDOS, but will not work on CP/M 2.2.  For example, `LDDS`, which loads the ZSDOS date/time stamper will only run on ZSDOS.
 
 ## Drive Letter Assignment
 
@@ -210,11 +222,29 @@ Nothing automatically initializes a slice as a file system.  You must do that yo
 
 While it probably obvious, you cannot use slices on any media less than 8MB in size.  Specifically, you cannot slice RAM disk, ROM disk, floppy disks, etc.
 
-# RomWBW Applications
+# Inbuilt ROM Applications
 
-A typical set of CP/M-80 2.2 and Z-System applications are included on the ROM file system. The Doc directory of the distribution contains the CP/M, ZSDOS, and ZCPR user manuals which provide the primary usage information. Note that the Z-System applications will generally not run under CP/M.
+In addition to CP/M 2.2 and Z-System, there are several additional ROM applications that can be launched directly from ROM.  These applications are not hosted by an operating system and so they are unable to save files to disk devices.
 
-The following custom applications are included on the ROM disk to enhance the operation of RomWBW:
+The following options are available at the boot loader prompt:
+
+| Application |                                                                |
+| ----------- | -------------------------------------------------------------- |
+| Monitor     | Z80 system debug monitor w/ Intel Hex loader                   |
+| Forth       | Brad Rodriguez's ANSI compatible Forth language                |
+| Basic       | Nascom 8K BASIC language                                       |
+| Tasty BASIC | Dimitri Theuling's Tiny BASIC implementation                   |
+| Play        | A simple video game (requires ANSI terminal emulation)         |
+
+In general, the command to exit these applications and restart the system is `BYE`.  The exceptions are the Monitor which uses `B` and Play which uses `Q`.
+
+Space is available in the ROM image for the inclusion of other software. Any inbuilt application can be set up to launch automatically at startup.
+
+# RomWBW Custom Applications
+
+The operation of the RomWBW hosted operating systems is enhanced through several custom applications.  These applications are functional on all of the OS variants included with RomWBW.
+
+The following custom applications are found on the RomWBW ROM disk and are, therefore, globally available.
 
 | Application | Description                                                    |
 | ----------- | -------------------------------------------------------------- |
@@ -239,24 +269,7 @@ Some custom applications do not fit on the ROM disk. They are found on the disk 
 
 There is additional documentation on some of these applications at the [RomWBW Applications Page](https://www.retrobrewcomputers.org/doku.php?id=software:firmwareos:romwbw:apps).
 
-# UNA Hardware BIOS
-
-John Coffman has produced a new generation of hardware BIOS called UNA. The standard RomWBW distribution includes it's own hardware BIOS. However, RomWBW can alternatively be constructed with UNA as the hardware BIOS portion of the ROM. If you wish to use the UNA variant of RomWBW, then just program your ROM with the ROM image called "UNA_std.rom" in the Binary directory. This one image is suitable on **all**  of the platforms and hardware UNA supports.
-
-UNA is customized dynamically using a ROM based setup routine and the setup is persisted in the system NVRAM of the RTC chip. This means that the single UNA-based ROM image can be used on most of the RetroBrew platforms and is easily customized. UNA also supports FAT file system access that can be used for in-situ ROM programming and loading system images.
-
-While John is likely to enhance UNA over time, there are currently a few things that UNA does not support:
-
-  * Floppy Drives
-  * Terminal Emulation
-  * Zeta 1, N8, RC2014, Easy Z80, and Dyno Systems
-  * Some older support boards
-
-The UNA version embedded in RomWBW is the latest production release of UNA. RomWBW will be updated with John's upcoming UNA release with support for VGA3 as soon as it reaches production status.
-
-Please refer to the the [UNA BIOS Firmware Page](https://www.retrobrewcomputers.org/doku.php?id=software:firmwareos:una:start) for more information on UNA.
-
-# Operating System Options
+# Operating Systems
 
 One of the primary goals of RomWBW is to expose a set of generic hardware functions that make it easy to adapt operating systems to any hardware supported by RomWBW.  As a result, there are now 5 operating systems that have been adapted to run under RomWBW.  The adaptations are identical for all hardware supported by RomWBW because RomWBW hides all hardware specifics from the operating system.
 
@@ -305,6 +318,23 @@ The process for building a custom ROM is documented in the ReadMe.txt file in th
 For those who are interested in more than basic system customization, note that all source code is provided (including the operating systems).  Modification of the source code is considered an expert level task and is left to the reader to pursue.
 
 Note that the ROM customization process does not apply to UNA. All UNA customization is performed within the ROM setup script.
+
+# UNA Hardware BIOS
+
+John Coffman has produced a new generation of hardware BIOS called UNA. The standard RomWBW distribution includes it's own hardware BIOS. However, RomWBW can alternatively be constructed with UNA as the hardware BIOS portion of the ROM. If you wish to use the UNA variant of RomWBW, then just program your ROM with the ROM image called "UNA_std.rom" in the Binary directory. This one image is suitable on **all**  of the platforms and hardware UNA supports.
+
+UNA is customized dynamically using a ROM based setup routine and the setup is persisted in the system NVRAM of the RTC chip. This means that the single UNA-based ROM image can be used on most of the RetroBrew platforms and is easily customized. UNA also supports FAT file system access that can be used for in-situ ROM programming and loading system images.
+
+While John is likely to enhance UNA over time, there are currently a few things that UNA does not support:
+
+  * Floppy Drives
+  * Terminal Emulation
+  * Zeta 1, N8, RC2014, Easy Z80, and Dyno Systems
+  * Some older support boards
+
+The UNA version embedded in RomWBW is the latest production release of UNA. RomWBW will be updated with John's upcoming UNA release with support for VGA3 as soon as it reaches production status.
+
+Please refer to the [UNA BIOS Firmware Page](https://www.retrobrewcomputers.org/doku.php?id=software:firmwareos:una:start) for more information on UNA.
 
 # RomWBW Distribution
 
