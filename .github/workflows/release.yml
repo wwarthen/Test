@@ -42,11 +42,9 @@ jobs:
       - name: Create Package Archive
         run: |
             zip -r RomWBW-${{env.PKGLBL}}-Package.zip .
-            ls -la
 
       - name: Upload Distribution Package
         uses: cb80/pubrel@latest
         with:
-          replace: true
           files: |
             RomWBW-${{env.PKGLBL}}-Package.zip 
