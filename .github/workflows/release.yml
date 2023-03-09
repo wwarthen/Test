@@ -25,7 +25,7 @@ jobs:
           
       - name: Build
         run: |
-          # export TZ='America/Los_Angeles'
+          export TZ='America/Los_Angeles'
           # sudo apt-get install libncurses-dev
           # sudo apt-get install srecord
           # make dist
@@ -41,7 +41,7 @@ jobs:
         run: |
             zip -r RomWBW-${{env.PKGLBL}}-Package.zip .
 
-      - name: Upload Distribution Package
+      - name: Upload Package Archive
         uses: AButler/upload-release-assets@v2.0.2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
