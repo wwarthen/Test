@@ -40,13 +40,22 @@ jobs:
       - name: Create Package Archive
         run: |
             zip -r RomWBW-SnapShot-Package.zip .
-            
+
       - name: Post SnapShot
-        uses: cb80/pubrel@latest
+        uses: docker://antonyurchenko/git-release:latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NAME_PREFIX: "Development SnapShot Release "
         with:
-          replace: true
-          files: |
+          args: |
             RomWBW-SnapShot-Package.zip
+            
+#      - name: Post SnapShot
+#        uses: cb80/pubrel@latest
+#        with:
+#          replace: true
+#          files: |
+#            RomWBW-SnapShot-Package.zip
 
 #      - name: Post SnapShot
 #        uses: wwarthen/actions/packages/automatic-releases@built-packages
