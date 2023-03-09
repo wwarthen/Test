@@ -46,5 +46,6 @@ jobs:
       - name: Upload Distribution Package
         uses: cb80/pubrel@latest
         with:
+          replace: true
           files: |
             RomWBW-${{env.PKGLBL}}-Package.zip 
