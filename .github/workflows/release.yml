@@ -29,7 +29,7 @@ jobs:
           # sudo apt-get install libncurses-dev
           # sudo apt-get install srecord
           # make dist
-          # rm -rf .git*
+          rm -rf .git*
       
       - name: Upload Artifact
         uses: actions/upload-artifact@v3.1.1
