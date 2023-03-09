@@ -45,6 +45,7 @@ jobs:
       - name: Upload Package
         uses: cb80/pubrel@latest
         with:
+          replace: true
           files: |
             Package.zip
 
