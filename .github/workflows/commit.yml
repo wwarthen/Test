@@ -46,7 +46,7 @@ jobs:
         with:
           replace: true
           files: |
-            RomWBW-${{env.PKGLBL}}-Package.zip 
+            RomWBW-SnapShot-Package.zip
 
 #      - name: Post SnapShot
 #        uses: wwarthen/actions/packages/automatic-releases@built-packages
