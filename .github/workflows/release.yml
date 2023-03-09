@@ -16,7 +16,7 @@ jobs:
         run: |
           LABEL=`echo "$GITHUB_REF" | sed "s|^refs/tags/||"`
           echo "PKGLBL=$LABEL" >> $GITHUB_ENV
-          echo "${{github.action_ref}}"
+          echo "${{github.repository}}"
           echo "${{github}}"
          
       - name: Display Diagnostics
