@@ -41,7 +41,13 @@ jobs:
         run: |
             zip -r Package.zip .
             ls -la
-          
+
+      - name: Upload Package
+        uses: cb80/pubrel@latest
+        with:
+          files: |
+            Package.zip
+
       - name: Upload Release Package
         uses: svenstaro/upload-release-action@2.5.0
         with:
