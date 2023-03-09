@@ -16,8 +16,6 @@ jobs:
         run: |
           LABEL=`echo "$GITHUB_REF" | sed "s|^refs/tags/||"`
           echo "PKGLBL=$LABEL" >> $GITHUB_ENV
-          echo "${{github.repository}}"
-          env
          
       - name: Display Diagnostics
         run: |
@@ -43,7 +41,8 @@ jobs:
         run: |
             zip -r RomWBW-${{env.PKGLBL}}-Package.zip .
 
-      - uses: AButler/upload-release-assets@v2.0.2
+      - name: Upload Distribution Package
+        uses: AButler/upload-release-assets@v2.0.2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           files: |
