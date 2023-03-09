@@ -43,9 +43,8 @@ jobs:
         run: |
             zip -r RomWBW-${{env.PKGLBL}}-Package.zip .
 
-      - name: Upload Distribution Package
-        uses: cb80/pubrel@latest
+      - uses: AButler/upload-release-assets@latest
         with:
-          replace: true
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            RomWBW-${{env.PKGLBL}}-Package.zip 
+            RomWBW-${{env.PKGLBL}}-Package.zip
