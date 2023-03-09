@@ -40,16 +40,23 @@ jobs:
       - name: Create Package Archive
         run: |
             zip -r RomWBW-SnapShot-Package.zip .
-
+            
       - name: Post SnapShot
-        uses: wwarthen/actions/packages/automatic-releases@built-packages
+        uses: cb80/pubrel@latest
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "SnapShot"
-          prerelease: true
-          title: "RomWBW Development SnapShot Build"
+          replace: true
           files: |
-            RomWBW-SnapShot-Package.zip
+            RomWBW-${{env.PKGLBL}}-Package.zip 
+
+#      - name: Post SnapShot
+#        uses: wwarthen/actions/packages/automatic-releases@built-packages
+#        with:
+#          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+#          automatic_release_tag: "SnapShot"
+#          prerelease: true
+#          title: "RomWBW Development SnapShot Build"
+#          files: |
+#            RomWBW-SnapShot-Package.zip
 
   buildMacOS:
     runs-on: macOS-12
