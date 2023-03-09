@@ -40,6 +40,7 @@ jobs:
       - name: Create Package Archive
         run: |
             zip -r Package.zip .
+            ls -la
           
       - name: Upload Release Package
         uses: svenstaro/upload-release-action@2.5.0
@@ -47,3 +48,4 @@ jobs:
           file: Package.zip
           asset_name: RomWBW-Package.zip
           overwrite: true
+ 
