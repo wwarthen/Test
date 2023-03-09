@@ -45,5 +45,5 @@ jobs:
         uses: svenstaro/upload-release-action@2.5.0
         with:
           file: Package.zip
-          asset_name: RomWBW-$tag-Package.zip
+          asset_name: RomWBW-Package.zip
           overwrite: true
