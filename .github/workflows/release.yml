@@ -39,9 +39,8 @@ jobs:
       
       - name: Create Package Archive
         run: |
-            echo $tag
             echo ${{env.PKGLBL}}
-            zip -r RomWBW-$tag-Package.zip .
+            zip -r RomWBW-${{env.PKGLBL}}-Package.zip .
             ls -la
 
       - name: Upload Package
@@ -49,12 +48,12 @@ jobs:
         with:
           replace: true
           files: |
-            Package.zip
+            RomWBW-${{env.PKGLBL}}-Package.zip
 
       - name: Upload Release Package
         uses: svenstaro/upload-release-action@2.5.0
         with:
-          file: Package.zip
+          file: RomWBW-${{env.PKGLBL}}-Package.zip
           asset_name: RomWBW-$tag-Package.zip
           overwrite: true
  
