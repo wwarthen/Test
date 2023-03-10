@@ -15,7 +15,8 @@ jobs:
     steps:
       - name: Diag
         run: |
-          echo GITHUB_REF: "$GITHUB_REG"
+          echo GITHUB_REF: "$GITHUB_REF"
+          env
     
       - uses: rlespinasse/github-slug-action@v4.4.1
 
