@@ -66,7 +66,7 @@ jobs:
             RomWBW-SnapShot-Package.zip
 
       - name: Remove Older Releases
-        uses: sgpublic/delete-release-action@v1.0
+        uses: wwarthen/delete-release-action@v1.0
         with:
           release-drop: true
           release-keep-count: 0
