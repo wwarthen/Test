@@ -42,7 +42,7 @@ jobs:
             zip -r RomWBW-SnapShot-Package.zip .
 
       - name: Post SnapShot
-        uses: docker://antonyurchenko/git-release:latest
+        uses: anton-yurchenko/git-release@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_NAME_PREFIX: "Development SnapShot Release "
