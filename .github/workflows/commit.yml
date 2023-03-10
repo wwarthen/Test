@@ -65,6 +65,18 @@ jobs:
           files: |
             RomWBW-SnapShot-Package.zip
 
+       - uses: sgpublic/delete-release-action@main
+         with:
+           release-drop: true
+           release-keep-count: 2
+           release-drop-tag: false
+           pre-release-drop: true
+           pre-release-keep-count: 1
+           pre-release-drop-tag: false
+           draft-drop: true
+         env:
+           GITHUB_TOKEN: ${{ secrets.TOKEN }}
+
   buildMacOS:
     runs-on: macOS-latest
 
