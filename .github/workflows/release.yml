@@ -17,6 +17,7 @@ jobs:
       
       - name: Create Package Label
         run: |
+          echo "$GITHUB_REF"
           LABEL=`echo "$GITHUB_REF" | sed "s|^refs/tags/||"`
           echo "PKGLBL=$LABEL" >> $GITHUB_ENV
          
