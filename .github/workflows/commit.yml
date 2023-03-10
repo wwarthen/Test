@@ -39,15 +39,15 @@ jobs:
         run: |
             zip -r RomWBW-SnapShot-Package.zip .
 
-      - name: Post SnapShot
-        uses: docker://antonyurchenko/git-release:latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_NAME_PREFIX: "Development SnapShot Release "
-          CHANGELOG_FILE: "none"
-        with:
-          args: |
-            RomWBW-SnapShot-Package.zip
+#      - name: Post SnapShot
+#        uses: docker://antonyurchenko/git-release:latest
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#          RELEASE_NAME_PREFIX: "Development SnapShot Release "
+#          CHANGELOG_FILE: "none"
+#        with:
+#          args: |
+#            RomWBW-SnapShot-Package.zip
             
 #      - name: Post SnapShot
 #        uses: cb80/pubrel@latest
@@ -56,15 +56,15 @@ jobs:
 #          files: |
 #            RomWBW-SnapShot-Package.zip
 
-#      - name: Post SnapShot
-#        uses: wwarthen/actions/packages/automatic-releases@built-packages
-#        with:
-#          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Post SnapShot
+        uses: wwarthen/actions/packages/automatic-releases@built-packages
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
 #          automatic_release_tag: "SnapShot"
-#          prerelease: true
-#          title: "RomWBW Development SnapShot Build"
-#          files: |
-#            RomWBW-SnapShot-Package.zip
+          prerelease: true
+          title: "RomWBW Development SnapShot Build"
+          files: |
+            RomWBW-SnapShot-Package.zip
 
   buildMacOS:
     runs-on: macOS-12
