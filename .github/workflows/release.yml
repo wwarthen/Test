@@ -18,13 +18,10 @@ jobs:
           echo "$GITHUB_REF"
           LABEL=`echo "$GITHUB_REF" | sed "s|^refs/tags/||"`
           echo "PKGLBL=$LABEL" >> $GITHUB_ENV
-         
-      - name: Display Diagnostics
-        run: |
           echo PKGLBL: "$PKGLBL"
           echo Upload URL: "${{github.event.release.upload_url}}"
           echo GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
-          
+         
       - name: Build
         run: |
           export TZ='America/Los_Angeles'
@@ -37,11 +34,21 @@ jobs:
         run: |
             zip -r RomWBW-${{env.PKGLBL}}-Package.zip .
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3.1.1
+      - name: Attach Package
+        uses: wwarthen/actions/packages/automatic-releases@built-packages
         with:
-          name: RomWBW-${{env.PKGLBL}}-Package
-          path: RomWBW-${{env.PKGLBL}}-Package.zip
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: true
+          title: "RomWBW Development SnapShot ${{env.PKGLBL}}"
+          files: |
+            RomWBW-${{env.PKGLBL}}-Package.zip
+
+
+#      - name: Upload Artifact
+#        uses: actions/upload-artifact@v3.1.1
+#        with:
+#          name: RomWBW-${{env.PKGLBL}}-Package
+#          path: RomWBW-${{env.PKGLBL}}-Package.zip
       
 #      - name: Upload Package Archive
 #        uses: AButler/upload-release-assets@v2.0.2

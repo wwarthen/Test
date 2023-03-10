@@ -3,7 +3,7 @@ name: Commit Build
 on:
   push:
     branches: 
-      - dev
+      - main
     tags-ignore:
       - '**'
 
