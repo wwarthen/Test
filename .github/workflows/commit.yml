@@ -72,7 +72,7 @@ jobs:
           release-drop: true
           release-keep-count: 0
           release-drop-tag: true
-          pre-release-drop: false
+          pre-release-drop: true
           pre-release-keep-count: 0
           pre-release-drop-tag: true
           draft-drop: true
