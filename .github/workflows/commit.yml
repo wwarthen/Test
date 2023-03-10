@@ -4,9 +4,6 @@ on:
   push:
     branches: 
        - '**'
-#      - main
-#      - master
-#      - dev
     tags-ignore:
       - '**'
 
@@ -31,67 +28,14 @@ jobs:
       - name: List Output
         run: |
           # cd Binary
-          # ls -l
-          # find -type f -exec md5sum '{}' \;
+          ls -l
+          find -type f -exec md5sum '{}' \;
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3.1.1
         with:
           name: RomWBW-Linux
           path: .
-
-#      - name: Create Package Archive
-#        run: |
-#            zip -r RomWBW-SnapShot-Package.zip .
-
-#      - name: Post SnapShot
-#        uses: docker://antonyurchenko/git-release:latest
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#          RELEASE_NAME_PREFIX: "Development SnapShot Release "
-#          CHANGELOG_FILE: "none"
-#        with:
-#          args: |
-#            RomWBW-SnapShot-Package.zip
-            
-#      - name: Post SnapShot
-#        uses: cb80/pubrel@latest
-#        with:
-#          replace: true
-#          files: |
-#            RomWBW-SnapShot-Package.zip
-
-#      - name: Post SnapShot
-#        uses: wwarthen/actions/packages/automatic-releases@built-packages
-#        with:
-#          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-#          prerelease: true
-#          title: "RomWBW Development SnapShot ${{env.GITHUB_REF_SLUG}}"
-#          files: |
-#            RomWBW-SnapShot-Package.zip
-
-#      - name: Remove Older Releases
-#        uses: wwarthen/delete-release-action@v1.2
-#        with:
-#          release-drop: true
-#          release-keep-count: 0
-#          release-drop-tag: true
-#          pre-release-drop: false
-#          pre-release-keep-count: 0
-#          pre-release-drop-tag: true
-#          draft-drop: true
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-#      - name: Remove Older Releases
-#        uses: s00d/delete-older-releases@0.2.1
-#        with:
-#          keep_latest: 1
-##          delete_tag_pattern: beta # defaults to ""
-#          delete_type: 'release'
-#          delete_branch: 'main'
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   buildMacOS:
     runs-on: macOS-latest
@@ -109,8 +53,8 @@ jobs:
       - name: List Output
         run: |
           # cd Binary
-          # ls -l
-          # find . -type f -exec md5 -r -- '{}' +;
+          ls -l
+          find . -type f -exec md5 -r -- '{}' +;
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3.1.1
