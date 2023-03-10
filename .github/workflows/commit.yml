@@ -2,8 +2,10 @@ name: Commit Build
 
 on:
   push:
-    branches: 
-      - main
+#    branches: 
+#      - main
+#      - master
+#      - dev
     tags-ignore:
       - '**'
 
