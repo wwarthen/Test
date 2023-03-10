@@ -31,15 +31,15 @@ jobs:
           # ls -l
           # find -type f -exec md5sum '{}' \;
 
+      - name: Create Package Archive
+        run: |
+            zip -r RomWBW-Linux-Package.zip .
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v3.1.1
         with:
-          name: RomWBW_Linux-${{env.GITHUB_REF_SLUG}}-${{env.GITHUB_SHA_SHORT}}
-          path: .
-
-      - name: Create Package Archive
-        run: |
-            zip -r RomWBW-SnapShot-Package.zip .
+          name: RomWBW-Linux-Package
+          path: RomWBW-Linux-Package.zip
 
 #      - name: Post SnapShot
 #        uses: docker://antonyurchenko/git-release:latest
