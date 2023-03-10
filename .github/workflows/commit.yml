@@ -62,7 +62,7 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
 #          automatic_release_tag: "SnapShot"
           prerelease: true
-          title: "RomWBW Development SnapShot Build"
+          title: "RomWBW Development SnapShot Release ${{env.GITHUB_REF_SLUG}}"
           files: |
             RomWBW-SnapShot-Package.zip
 
