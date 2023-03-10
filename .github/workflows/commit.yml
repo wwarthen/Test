@@ -46,7 +46,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_NAME_PREFIX: "Development SnapShot Release "
-          CHANGELOG_FILE: "none"
         with:
           args: |
             RomWBW-SnapShot-Package.zip
