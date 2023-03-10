@@ -76,7 +76,7 @@ jobs:
           pre-release-drop-tag: false
           draft-drop: true
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   buildMacOS:
     runs-on: macOS-latest
