@@ -13,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Diag
+        run: |
+          echo GITHUB_REF: "$GITHUB_REG"
+    
       - uses: rlespinasse/github-slug-action@v4.4.1
 
       - uses: actions/checkout@v3.3.0
