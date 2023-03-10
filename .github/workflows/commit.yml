@@ -74,7 +74,7 @@ jobs:
           pre-release-drop: true
           pre-release-keep-count: 1
           pre-release-drop-tag: false
-          draft-drop: true
+          draft-drop: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
