@@ -58,27 +58,27 @@ jobs:
 #          files: |
 #            RomWBW-SnapShot-Package.zip
 
-      - name: Post SnapShot
-        uses: wwarthen/actions/packages/automatic-releases@built-packages
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: true
-          title: "RomWBW Development SnapShot ${{env.GITHUB_REF_SLUG}}"
-          files: |
-            RomWBW-SnapShot-Package.zip
+#      - name: Post SnapShot
+#        uses: wwarthen/actions/packages/automatic-releases@built-packages
+#        with:
+#          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+#          prerelease: true
+#          title: "RomWBW Development SnapShot ${{env.GITHUB_REF_SLUG}}"
+#          files: |
+#            RomWBW-SnapShot-Package.zip
 
-      - name: Remove Older Releases
-        uses: wwarthen/delete-release-action@v1.2
-        with:
-          release-drop: true
-          release-keep-count: 0
-          release-drop-tag: true
-          pre-release-drop: false
-          pre-release-keep-count: 0
-          pre-release-drop-tag: true
-          draft-drop: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Remove Older Releases
+#        uses: wwarthen/delete-release-action@v1.2
+#        with:
+#          release-drop: true
+#          release-keep-count: 0
+#          release-drop-tag: true
+#          pre-release-drop: false
+#          pre-release-keep-count: 0
+#          pre-release-drop-tag: true
+#          draft-drop: true
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 #      - name: Remove Older Releases
 #        uses: s00d/delete-older-releases@0.2.1
