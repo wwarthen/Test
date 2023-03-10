@@ -70,10 +70,10 @@ jobs:
         with:
           release-drop: true
           release-keep-count: -1
-          release-drop-tag: false
+          release-drop-tag: true
           pre-release-drop: true
           pre-release-keep-count: -1
-          pre-release-drop-tag: false
+          pre-release-drop-tag: true
           draft-drop: true
           
         env:
