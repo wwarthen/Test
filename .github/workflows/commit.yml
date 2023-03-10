@@ -2,8 +2,10 @@ name: Commit Build
 
 on:
   push:
-    tags:
-      - v*
+    branches: 
+      - main
+    tags-ignore:
+      - **
 
 jobs:
   buildLinux:

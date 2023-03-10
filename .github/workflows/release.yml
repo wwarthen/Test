@@ -1,8 +1,11 @@
 name: Release Build
 
 on:
-  release:
-    types: published
+  push:
+    branches: 
+      - main
+    tags:
+      - **
 
 jobs:
   build:
@@ -31,19 +34,19 @@ jobs:
           # make dist
           rm -rf .git*
       
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3.1.1
-        with:
-          name: RomWBW-${{env.PKGLBL}}-Package
-          path: .
-      
       - name: Create Package Archive
         run: |
             zip -r RomWBW-${{env.PKGLBL}}-Package.zip .
 
-      - name: Upload Package Archive
-        uses: AButler/upload-release-assets@v2.0.2
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3.1.1
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            RomWBW-${{env.PKGLBL}}-Package.zip
+          name: RomWBW-${{env.PKGLBL}}-Package
+          path: RomWBW-${{env.PKGLBL}}-Package.zip
+      
+#      - name: Upload Package Archive
+#        uses: AButler/upload-release-assets@v2.0.2
+#        with:
+#          repo-token: ${{ secrets.GITHUB_TOKEN }}
+#          files: |
+#            RomWBW-${{env.PKGLBL}}-Package.zip
