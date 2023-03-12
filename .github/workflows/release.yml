@@ -94,7 +94,7 @@ jobs:
 #            RomWBW-SnapShot-Package.zip
 
       - name: Remove Older Releases
-        uses: wwarthen/test-action@v1.1.0
+        uses: wwarthen/test-action@v1.2.0
         with:
           release-drop: true
           release-keep-count: 10
