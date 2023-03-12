@@ -44,6 +44,20 @@ jobs:
           title: "RomWBW Development SnapShot ${{env.PKGLBL}}"
           files: |
             RomWBW-${{env.PKGLBL}}-Package.zip
+
+  hello_world_job:
+    runs-on: ubuntu-latest
+    name: A job to say hello
+    steps:
+      - name: Hello world action step
+        id: hello
+        uses: wwarthen/test-action@v1.0.0
+        with:
+          who-to-greet: 'Mona the Octocat'
+      # Use the output from the `hello` step
+      - name: Get the output time
+        run: echo "The time was ${{ steps.hello.outputs.time }}"
+
       
 #      - name: Upload Package Archive
 #        uses: AButler/upload-release-assets@v2.0.2
