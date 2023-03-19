@@ -17,11 +17,15 @@ jobs:
       - name: Create Package Label
         run: |
           echo GITHUB_REF: "$GITHUB_REF"
+          echo "${{ github.ref_name }}"
           LABEL=`echo "$GITHUB_REF" | sed "s|^refs/tags/||"`
+          echo PKGLBL: "$LABEL"
           echo "PKGLBL=$LABEL" >> $GITHUB_ENV
-          echo PKGLBL: "$PKGLBL"
+          LABEL="${{ github.ref_name }}
+          echo "$LABEL"
           echo Upload URL: "${{github.event.release.upload_url}}"
           echo GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
+          echo GITHUB_
          
       - name: Build
         run: |
