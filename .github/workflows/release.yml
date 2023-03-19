@@ -26,8 +26,8 @@ jobs:
       - name: Build
         run: |
           export TZ='America/Los_Angeles'
-          # sudo apt-get install libncurses-dev
-          # sudo apt-get install srecord
+          sudo apt-get install libncurses-dev
+          sudo apt-get install srecord
           # make dist
           rm -rf .git*
       
@@ -44,20 +44,6 @@ jobs:
           title: "RomWBW Development SnapShot ${{env.PKGLBL}}"
           files: |
             RomWBW-${{env.PKGLBL}}-Package.zip
-
-  hello_world_job:
-    runs-on: ubuntu-latest
-    name: A job to say hello
-    steps:
-      - name: Hello world action step
-        id: hello
-        uses: wwarthen/test-action@v1.0.0
-        with:
-          who-to-greet: 'Mona the Octocat'
-      # Use the output from the `hello` step
-      - name: Get the output time
-        run: echo "The time was ${{ steps.hello.outputs.time }}"
-
       
 #      - name: Upload Package Archive
 #        uses: AButler/upload-release-assets@v2.0.2
@@ -93,18 +79,18 @@ jobs:
 #          files: |
 #            RomWBW-SnapShot-Package.zip
 
-      - name: Remove Older Releases
-        uses: wwarthen/test-action@v1.2.0
-        with:
-          release-drop: true
-          release-keep-count: 10
-          release-drop-tag: false
-          pre-release-drop: true
-          pre-release-keep-count: 10
-          pre-release-drop-tag: false
-          draft-drop: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Remove Older Releases
+#        uses: wwarthen/delete-release-action@v1.2
+#        with:
+#          release-drop: true
+#          release-keep-count: 0
+#          release-drop-tag: true
+#          pre-release-drop: false
+#          pre-release-keep-count: 0
+#          pre-release-drop-tag: true
+#          draft-drop: true
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 #      - name: Remove Older Releases
 #        uses: s00d/delete-older-releases@0.2.1
