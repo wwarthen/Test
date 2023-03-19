@@ -13,8 +13,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Make Slugs
-        uses: rlespinasse/github-slug-action@v4.4.1
+#      - name: Make Slugs
+#        uses: rlespinasse/github-slug-action@v4.4.1
+
+     - name: Get Commit Ref
+       echo "COMMIT_REF=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_ENV
 
       - name: Checkout
         uses: actions/checkout@v3.3.0
@@ -37,7 +40,7 @@ jobs:
         uses: actions/upload-artifact@v3.1.1
         with:
 #          name: RomWBW-${{env.GITHUB_SHA_SHORT}}-Linux
-          name: RomWBW-$(git rev-parse --short "$GITHUB_SHA")-Linux
+          name: RomWBW-${{env.COMMIT_REF}}-Linux
           path: .
 
   buildMacOS:
