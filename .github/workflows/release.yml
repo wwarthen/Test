@@ -14,17 +14,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3.3.0
 
-      - name: Create Package Label
-        run: |
-          echo GITHUB_REF: "$GITHUB_REF"
-          echo "${{ github.ref_name }}"
-          LABEL=`echo "$GITHUB_REF" | sed "s|^refs/tags/||"`
-          echo PKGLBL: "$LABEL"
-          echo "PKGLBL=$LABEL" >> $GITHUB_ENV
-          LABEL="${{ github.ref_name }}"
-          echo "$LABEL"
-          echo Upload URL: "${{github.event.release.upload_url}}"
-          echo GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
+#      - name: Create Package Label
+#        run: |
+#          echo GITHUB_REF: "$GITHUB_REF"
+#          echo "${{ github.ref_name }}"
+#          LABEL=`echo "$GITHUB_REF" | sed "s|^refs/tags/||"`
+#          echo PKGLBL: "$LABEL"
+#          echo "PKGLBL=$LABEL" >> $GITHUB_ENV
+#          LABEL="${{ github.ref_name }}"
+#          echo "$LABEL"
+#          echo Upload URL: "${{github.event.release.upload_url}}"
+#          echo GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
          
       - name: Build
         run: |
@@ -36,7 +36,7 @@ jobs:
       
       - name: Create Package Archive
         run: |
-            zip -r RomWBW-${{env.PKGLBL}}-Package.zip .
+            zip -r RomWBW-${{github.ref_name}}-Package.zip .
 
       - name: Attach Package Archive
         uses: wwarthen/actions/packages/automatic-releases@built-packages
