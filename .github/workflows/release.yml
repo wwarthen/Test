@@ -25,7 +25,6 @@ jobs:
           echo "$LABEL"
           echo Upload URL: "${{github.event.release.upload_url}}"
           echo GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
-          echo GITHUB_
          
       - name: Build
         run: |
@@ -45,9 +44,9 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           draft: true
           prerelease: true
-          title: "RomWBW Development SnapShot ${{env.PKGLBL}}"
+          title: "RomWBW Development SnapShot ${{github.ref_name}}"
           files: |
-            RomWBW-${{env.PKGLBL}}-Package.zip
+            RomWBW-${{github.ref_name}}-Package.zip
       
 #      - name: Upload Package Archive
 #        uses: AButler/upload-release-assets@v2.0.2
