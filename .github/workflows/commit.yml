@@ -16,13 +16,13 @@ jobs:
 #      - name: Make Slugs
 #        uses: rlespinasse/github-slug-action@v4.4.1
 
+      - name: Checkout
+        uses: actions/checkout@v3.3.0
+
       - name: Get Commit Ref
         run: |
           echo "COMMIT_REF=$(git rev-parse --short $GITHUB_SHA)"
           echo "COMMIT_REF=$(git rev-parse --short $GITHUB_SHA)" >> $GITHUB_ENV
-
-      - name: Checkout
-        uses: actions/checkout@v3.3.0
 
       - name: Build
         run: |
