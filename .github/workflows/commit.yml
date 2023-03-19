@@ -29,7 +29,7 @@ jobs:
 
       - name: List Output
         run: |
-          cd Binary
+          # cd Binary
           ls -l
           find -type f -exec md5sum '{}' \;
 
@@ -58,7 +58,7 @@ jobs:
 
       - name: List Output
         run: |
-          cd Binary
+          # cd Binary
           ls -l
           find . -type f -exec md5 -r -- '{}' +;
 
