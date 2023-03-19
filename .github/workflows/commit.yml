@@ -22,14 +22,14 @@ jobs:
       - name: Build
         run: |
           export TZ='America/Los_Angeles'
-          # sudo apt-get install libncurses-dev
-          # sudo apt-get install srecord
+          sudo apt-get install libncurses-dev
+          sudo apt-get install srecord
           # make dist
           rm -rf .git*
 
       - name: List Output
         run: |
-          # cd Binary
+          cd Binary
           ls -l
           find -type f -exec md5sum '{}' \;
 
@@ -52,13 +52,13 @@ jobs:
       - name: Build
         run: |
           export TZ='America/Los_Angeles'
-          # brew install srecord
+          brew install srecord
           # make dist
           rm -rf .git*
 
       - name: List Output
         run: |
-          # cd Binary
+          cd Binary
           ls -l
           find . -type f -exec md5 -r -- '{}' +;
 
