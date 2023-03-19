@@ -21,7 +21,7 @@ jobs:
           LABEL=`echo "$GITHUB_REF" | sed "s|^refs/tags/||"`
           echo PKGLBL: "$LABEL"
           echo "PKGLBL=$LABEL" >> $GITHUB_ENV
-          LABEL="${{ github.ref_name }}
+          LABEL="${{ github.ref_name }}"
           echo "$LABEL"
           echo Upload URL: "${{github.event.release.upload_url}}"
           echo GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
