@@ -24,7 +24,22 @@ jobs:
       
       - name: Create Package Archive
         run: |
-            zip -r RomWBW-${{github.ref_name}}-Package.zip .
+          zip -r RomWBW-${{github.ref_name}}-Package.zip .
+
+      - name: Set Title
+        run: |
+          echo "${{github.ref_name}}"
+          if grep -q "dev" <<< "${{github.ref_name}}"; then
+            TITLE="RomWBW Development Snapshot"
+          elsif grep -q "pre" <<< "${{github.ref_name}}"; then
+            TITLE="RomWBW Prerelease Snapshot"
+          elsif grep -q "rc" <<< "${{github.ref_name}}"; then
+            TITLE="RomWBW Release Candidate"
+          else
+            TITLE="RomWBW"
+          fi
+          echo $TITLE
+          echo "TITLE=$TITLE" >>$GITHUB_ENV
 
       - name: Attach Package Archive
         uses: wwarthen/actions/packages/automatic-releases@built-packages
@@ -32,7 +47,7 @@ jobs:
           repo_token: "${{secrets.GITHUB_TOKEN}}"
           draft: true
           prerelease: true
-          title: "RomWBW Development SnapShot ${{github.ref_name}}"
+          title: "${{env.TITLE}} ${{github.ref_name}}"
           files: |
             RomWBW-${{github.ref_name}}-Package.zip
       
@@ -48,7 +63,7 @@ jobs:
 #        uses: docker://antonyurchenko/git-release:latest
 #        env:
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#          RELEASE_NAME_PREFIX: "Development SnapShot Release "
+#          RELEASE_NAME_PREFIX: "${{env.TITLE}} "
 #          CHANGELOG_FILE: "none"
 #        with:
 #          args: |
