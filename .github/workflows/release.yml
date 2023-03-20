@@ -28,7 +28,7 @@ jobs:
 
       - name: Set Title
         run: |
-          echo "${{github.ref_name}}"
+          echo "Tag: ${{github.ref_name}}"
           if grep -q "dev" <<< "${{github.ref_name}}"; then
             TITLE="RomWBW Development Snapshot"
           elif grep -q "pre" <<< "${{github.ref_name}}"; then
@@ -38,7 +38,7 @@ jobs:
           else
             TITLE="RomWBW"
           fi
-          echo $TITLE
+          echo "Title: $TITLE"
           echo "TITLE=$TITLE" >>$GITHUB_ENV
 
       - name: Attach Package Archive
