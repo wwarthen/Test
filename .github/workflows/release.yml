@@ -31,9 +31,9 @@ jobs:
           echo "${{github.ref_name}}"
           if grep -q "dev" <<< "${{github.ref_name}}"; then
             TITLE="RomWBW Development Snapshot"
-          elsif grep -q "pre" <<< "${{github.ref_name}}"; then
-            TITLE="RomWBW Prerelease Snapshot"
-          elsif grep -q "rc" <<< "${{github.ref_name}}"; then
+          elif grep -q "pre" <<< "${{github.ref_name}}"; then
+            TITLE="RomWBW Prerelease"
+          elif grep -q "rc" <<< "${{github.ref_name}}"; then
             TITLE="RomWBW Release Candidate"
           else
             TITLE="RomWBW"
