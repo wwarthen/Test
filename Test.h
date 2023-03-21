@@ -1,0 +1,2 @@
+#define SIM_ARCHIVE_GIT_COMMIT_ID $Format:%H$
+#define SIM_ARCHIVE_GIT_COMMIT_TIME $Format:%aI$
