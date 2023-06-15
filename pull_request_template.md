@@ -1,6 +1,4 @@
-**All pull requests should be based against the dev branch**
-
-Please replace these comments with:
-- Description of the change
-- Reference to repository Issue (if applicable)
-
+Pull Request instructions:
+- Please base all pull requests against the dev branch
+- Remove and replace these comments with a description of your change
+- Reference related Issue(s) (e.g., "resolves Issue #123")
